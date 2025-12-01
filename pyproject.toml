@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "BENCH"
+version = "0.0.1"
+description = "BENCH"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+keywords = []
+authors = [{ name = "Jesse Vogel", email = "jesse.t.vogel@gmail.com" }]
+maintainers = [{ name = "Jesse Vogel", email = "jesse.t.vogel@gmail.com" }]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = ["slash @ git+https://github.com/jessetvogel/slash.git@main"]
+
+[project.optional-dependencies]
+dev = ["ruff", "mypy", "pytest"]
+
+[project.scripts]
+bench-dashboard = "bench.dashboard.main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+package-data = {}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+lint.select = ["E", "F", "I"]
+line-length = 120

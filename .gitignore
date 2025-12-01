@@ -1,0 +1,10 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.egg-info
+.ruff_cache
+
+# Temporary files
+tmp/
