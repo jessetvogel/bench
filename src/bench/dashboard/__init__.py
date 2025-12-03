@@ -1,3 +1,1 @@
-from bench.dashboard.main import main
-
-__all__: list[str] = ["main"]
+from bench.dashboard._dashboard import Dashboard as Dashboard

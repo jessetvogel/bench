@@ -1,60 +1,101 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Generic, Literal, Protocol, Self, TypeAlias, TypeVar
+from collections.abc import Iterable
+from typing import Literal, Mapping, Protocol, Self, TypeAlias
 
-from bench.serialization import Data, Serializable
+from bench.serialization import PlainData, Serializable
 
 
-class Task(Serializable, Protocol):
-    """Protocol for a task."""
+class Task(ABC, Serializable):
+    """Abstract base class for a task."""
 
-    @property
-    def name(self) -> str: ...
+    @classmethod
+    def name(cls) -> str:
+        return cls.__name__
+
+    @abstractmethod
+    def metrics(self, result: Result) -> Metrics: ...
+
+    @abstractmethod
+    def encode(self) -> PlainData: ...
+
+    @classmethod
+    @abstractmethod
+    def decode(cls, data: PlainData) -> Self: ...
 
 
 class Method(Serializable, Protocol):
-    """Protocol for a method."""
+    """Abstract base class for a method."""
 
-    @property
-    def name(self) -> str: ...
+    @classmethod
+    @abstractmethod
+    def name(cls) -> str: ...
+
+    @abstractmethod
+    def encode(self) -> PlainData: ...
+
+    @classmethod
+    @abstractmethod
+    def decode(cls, data: PlainData) -> Self: ...
 
 
 class Token(Serializable):
     """Token class, can be used to poll for a result."""
 
-    def __init__(self, data: Data) -> None:
+    def __init__(self, data: PlainData) -> None:
         self._data = data
 
     @property
-    def data(self) -> Data:
+    def data(self) -> PlainData:
         return self._data
 
-    def encode(self) -> Data:
+    def encode(self) -> PlainData:
         return self.data
 
     @classmethod
-    def decode(cls, data: Data) -> Self:
+    def decode(cls, data: PlainData) -> Self:
         return cls(data)
 
 
-class Result(Serializable, Protocol):
+class Result(Serializable):
     """Protocol for a result."""
+
+    def __init__(self, data: Mapping[str, PlainData]) -> None:
+        self._data = dict(data)
+
+    def __getitem__(self, index: str) -> PlainData:
+        return self._data[index]
+
+    def __setitem__(self, index: str, value: PlainData) -> None:
+        self._data[index] = value
+
+    def encode(self) -> PlainData:
+        return dict(self._data)
+
+    @classmethod
+    def decode(cls, data: PlainData) -> Self:
+        assert isinstance(data, dict)
+        return cls(data)
 
 
 class Metrics:
     """Metrics computed from a result for a task."""
 
-    def __init__(self, data: dict[str, Data]) -> None:
-        self._data = data
+    def __init__(self, data: Mapping[str, PlainData]) -> None:
+        self._data = dict(data)
 
-    @property
-    def data(self) -> dict[str, Data]:
-        return self._data
+    def __getitem__(self, index: str) -> PlainData:
+        return self._data[index]
 
-    def serialize(self) -> Data:
-        return self.data
+    def __setitem__(self, index: str, value: PlainData) -> None:
+        self._data[index] = value
+
+    def encode(self) -> PlainData:
+        return dict(self._data)
 
     @classmethod
-    def deserialize(cls, data: Data) -> Self:
+    def decode(cls, data: PlainData) -> Self:
         assert isinstance(data, dict)
         return cls(data)
 
@@ -74,24 +115,20 @@ class BenchError(Exception, Serializable):
     def message(self) -> str:
         return self._message
 
-    def encode(self) -> Data:
+    def encode(self) -> PlainData:
         return self.message
 
     @classmethod
-    def decode(cls, data: Data) -> Self:
+    def decode(cls, data: PlainData) -> Self:
         assert isinstance(data, str)
         return cls(data)
 
 
-TASK = TypeVar("TASK", bound=Task)
-METHOD = TypeVar("METHOD", bound=Method)
-RESULT = TypeVar("RESULT", bound=Result)
-
 RunStatus: TypeAlias = Literal["running", "done", "failed"]
 
 
-class Run(Generic[RESULT]):
-    def __init__(self, id: int, task_id: str, method_id: str, result: Token | RESULT | BenchError) -> None:
+class Run:
+    def __init__(self, id: int, task_id: str, method_id: str, result: Token | Result | BenchError) -> None:
         self._id = id
         self._task_id = task_id
         self._method_id = method_id
@@ -110,60 +147,67 @@ class Run(Generic[RESULT]):
         return self._method_id
 
     @property
-    def result(self) -> Token | RESULT | BenchError:
+    def result(self) -> Token | Result | BenchError:
         return self._result
 
     @result.setter
-    def result(self, result: Token | RESULT | BenchError) -> None:
+    def result(self, result: Token | Result | BenchError) -> None:
         self._result = result
 
     @property
     def status(self) -> RunStatus:
         if isinstance(self.result, Token):
             return "running"
+        if isinstance(self.result, Result):
+            return "done"
         if isinstance(self.result, BenchError):
             return "failed"
 
-        return "done"
-
-        # msg = f"Expected result of run to be `Token`, `Result` or `BenchError`, got `{type(self.result)}`"
-        # raise ValueError(msg)
+        msg = f"Expected result of run to be `Token`, `Result` or `BenchError`, got `{type(self.result)}`"
+        raise ValueError(msg)
 
 
-class Bench(ABC, Generic[TASK, METHOD, RESULT]):
-    def __init__(self, task_type: type[TASK], method_type: type[METHOD], result_type: type[RESULT]) -> None:
-        self._task_type = task_type
-        self._method_type = method_type
-        self._result_type = result_type
-
-    @property
-    def task_type(self) -> type[TASK]:
-        return self._task_type
-
-    @property
-    def method_type(self) -> type[METHOD]:
-        return self._method_type
-
-    @property
-    def result_type(self) -> type[RESULT]:
-        return self._result_type
+class Bench(ABC):
+    """Specification of the benchmark."""
 
     @property
     @abstractmethod
-    def name(self) -> str: ...
+    def name(self) -> str:
+        """Name of the benchmark."""
 
     @abstractmethod
-    def run(self, task: TASK, method: METHOD) -> Token | RESULT:
-        """Run the given task with the given method."""
-        raise NotImplementedError("Method `run` not implemented")
+    def task_types(self) -> Iterable[type[Task]]:
+        """Iterable of supported task types."""
+        raise NotImplementedError()
 
     @abstractmethod
-    def poll(self, token: Token) -> RESULT | None:
-        """Poll for a result using a token."""
-        # TODO: Should this poll function also take a task or method?
-        raise NotImplementedError("Method `poll` not implemented")
+    def method_types(self) -> Iterable[type[Method]]:
+        """Iterable of supported method types."""
+        raise NotImplementedError()
 
     @abstractmethod
-    def metrics(self, task: TASK, result: RESULT) -> Metrics:
-        """Compute metrics from a result for a given task."""
-        raise NotImplementedError("Method `metrics` not implemented")
+    def run(self, task: Task, method: Method) -> Result | Token:
+        """Run the given task with the given method.
+
+        Args:
+            task: Task to perform.
+            method: Method to apply.
+
+        Returns:
+            A :py:class:`Result` instance if the task can be completed at once.
+            Otherwise, a :py:class:`Token` instance is returned which can be used
+            to obtain the result at a later time.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def poll(self, token: Token) -> Result | None:
+        """Poll the result of a task using a token.
+
+        Args:
+            token: Token returned by the :py:meth:`run` method.
+
+        Returns:
+            A :py:class:`Result` instance if the task is completed, otherwise :py:const:`None`.
+        """
+        raise NotImplementedError()

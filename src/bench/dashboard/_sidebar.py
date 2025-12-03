@@ -1,15 +1,18 @@
-from functools import partial
 from typing import Any, Awaitable, Callable
 
 from slash.core import Children, Elem, Session
 from slash.html import Div
 from slash.layout import Column, Row
+from slash.reactive import Signal
+
+from bench.templates import Task
 
 
 class Sidebar(Column):
-    def __init__(self, set_content: Callable[[Elem], None]) -> None:
+    def __init__(self, tasks: Signal[list[Task]], content: Signal[Elem]) -> None:
         super().__init__()
-        self._set_content = set_content
+        self._tasks = tasks
+        self._content = content
         self._setup()
 
     def _setup(self) -> None:
@@ -29,8 +32,8 @@ class Sidebar(Column):
 
         # Tasks
         self._add_header("Tasks")
-        for task in ["Task 1", "Task 2"]:
-            self._add_item(task, onclick=partial(self._click_task, task))
+        for task in self._tasks():
+            self._add_item(task.name())
 
         # --------
         self._add_separator()

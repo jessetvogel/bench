@@ -2,25 +2,24 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Generic
 
 from bench.serialization import from_json, serializable_id, to_json
-from bench.templates import METHOD, RESULT, TASK, Bench, BenchError, Run, Token
+from bench.templates import Bench, BenchError, Method, Result, Run, Task, Token
 
 BENCH_CACHE = ".bench_cache"
 GITIGNORE = ".gitignore"
 
 SQL_INIT = [
-    "CREATE TABLE `tasks` (`id` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
-    "CREATE TABLE `methods` (`id` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
+    "CREATE TABLE `tasks` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
+    "CREATE TABLE `methods` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
     "CREATE TABLE `runs` (`id` INTEGER NOT NULL, `task` TEXT NOT NULL, `method` TEXT NOT NULL, `status` TEXT NOT NULL, `result` BLOB NOT NULL, PRIMARY KEY (`id`))",  # noqa: E501
 ]
 
 
-class Cache(Generic[TASK, METHOD, RESULT]):
+class Cache:
     """Cache data manager."""
 
-    def __init__(self, bench: Bench[TASK, METHOD, RESULT]) -> None:
+    def __init__(self, bench: Bench) -> None:
         self._bench = bench
 
         self._setup()
@@ -64,7 +63,7 @@ class Cache(Generic[TASK, METHOD, RESULT]):
 
     # PUBLIC API
 
-    def insert_task(self, task: TASK) -> None:
+    def insert_task(self, task: Task) -> None:
         """Insert task into database."""
         task_id = serializable_id(task)
         task_blob = to_json(task).encode()
@@ -73,7 +72,7 @@ class Cache(Generic[TASK, METHOD, RESULT]):
         cursor.execute("INSERT INTO `tasks` VALUES (?, ?)", (task_id, task_blob))
         self._db.commit()
 
-    def insert_method(self, method: METHOD) -> None:
+    def insert_method(self, method: Method) -> None:
         """Insert method into database."""
         method_id = serializable_id(method)
         method_blob = to_json(method).encode()
@@ -82,7 +81,7 @@ class Cache(Generic[TASK, METHOD, RESULT]):
         cursor.execute("INSERT INTO `methods` VALUES (?, ?)", (method_id, method_blob))
         self._db.commit()
 
-    def insert_or_update_run(self, run: Run[RESULT]) -> None:
+    def insert_or_update_run(self, run: Run) -> None:
         """Insert run into database, or update it if already in the database."""
         result_blob = to_json(run.result).encode()
 
@@ -102,34 +101,40 @@ class Cache(Generic[TASK, METHOD, RESULT]):
             )
         self._db.commit()
 
-    def select_tasks(self) -> list[TASK]:
+    def select_tasks(self) -> list[Task]:
         """Return all tasks that are present in the cache."""
-        tasks: list[TASK] = []
+        tasks: list[Task] = []
         cursor = self._db.cursor()
-        cursor.execute("SELECT `data` FROM `tasks`")
+        cursor.execute("SELECT `type`, `data` FROM `tasks`")
         while (row := cursor.fetchone()) is not None:
             # TODO: WRAP IN TRY EXCEPT AND PRINT WARNING IF FAILS
-            assert isinstance(blob := row[0], bytes)
-            task = from_json(self._bench.task_type, blob.decode())
+            task_type_name, blob = row
+            assert isinstance(task_type_name, str)
+            assert isinstance(blob, bytes)
+            task_type = self._get_task_type(task_type_name)
+            task = from_json(task_type, blob.decode())
             tasks.append(task)
         return tasks
 
-    def select_methods(self) -> list[METHOD]:
+    def select_methods(self) -> list[Method]:
         """Return all methods that are present in the cache."""
-        methods: list[METHOD] = []
+        methods: list[Method] = []
         cursor = self._db.cursor()
-        cursor.execute("SELECT `data` FROM `methods`")
+        cursor.execute("SELECT `type`, `data` FROM `methods`")
         while (row := cursor.fetchone()) is not None:
             # TODO: WRAP IN TRY EXCEPT AND PRINT WARNING IF FAILS
-            assert isinstance(blob := row[0], bytes)
-            method = from_json(self._bench.method_type, blob.decode())
+            method_type_name, blob = row
+            assert isinstance(method_type_name, str)
+            assert isinstance(blob, bytes)
+            method_type = self._get_method_type(method_type_name)
+            method = from_json(method_type, blob.decode())
             methods.append(method)
         return methods
 
-    def select_runs(self, task: TASK) -> list[Run[RESULT]]:
+    def select_runs(self, task: Task) -> list[Run]:
         task_id = serializable_id(task)
 
-        runs: list[Run[RESULT]] = []
+        runs: list[Run] = []
         cursor = self._db.cursor()
         cursor.execute("SELECT `id`, `method`, `status`, `result` FROM `runs` WHERE `task` = ?", (task_id,))
         while (row := cursor.fetchone()) is not None:
@@ -139,11 +144,11 @@ class Cache(Generic[TASK, METHOD, RESULT]):
             assert isinstance(status, str)
             assert isinstance(result_blob, bytes)
 
-            result: Token | RESULT | BenchError
+            result: Token | Result | BenchError
             if status == "running":
                 result = from_json(Token, result_blob.decode())
             elif status == "done":
-                result = from_json(self._bench.result_type, result_blob.decode())
+                result = from_json(Result, result_blob.decode())
             elif status == "failed":
                 result = from_json(BenchError, result_blob.decode())
             else:
@@ -153,3 +158,19 @@ class Cache(Generic[TASK, METHOD, RESULT]):
             runs.append(Run(run_id, task_id, method_id, result))
 
         return runs
+
+    def _get_task_type(self, name: str) -> type[Task]:
+        if not hasattr(self, "_task_types"):
+            self._task_types = {task_type.name(): task_type for task_type in self._bench.task_types()}
+        if name not in self._task_types:
+            msg = f"Unknown task type '{name}'"
+            raise ValueError(msg)
+        return self._task_types[name]
+
+    def _get_method_type(self, name: str) -> type[Method]:
+        if not hasattr(self, "_method_types"):
+            self._method_types = {method_type.name(): method_type for method_type in self._bench.method_types()}
+        if name not in self._method_types:
+            msg = f"Unknown method type '{name}'"
+            raise ValueError(msg)
+        return self._method_types[name]
