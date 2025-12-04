@@ -5,13 +5,14 @@ from slash.html import Div
 from slash.layout import Column, Row
 from slash.reactive import Signal
 
-from bench.templates import Task
+from bench.dashboard._page_task import PageTask
+from bench.engine import Engine
 
 
 class Sidebar(Column):
-    def __init__(self, tasks: Signal[list[Task]], content: Signal[Elem]) -> None:
+    def __init__(self, engine: Engine, content: Signal[Elem]) -> None:
         super().__init__()
-        self._tasks = tasks
+        self._engine = engine
         self._content = content
         self._setup()
 
@@ -19,12 +20,10 @@ class Sidebar(Column):
         self.style(
             {
                 "width": "224px",
-                "height": "calc(100dvh - 16px)",
-                "margin": "8px",
+                "height": "100dvh",
                 "background-color": "var(--bg)",
                 "box-shadow": "var(--shadow)",
-                "border": "1px solid var(--border)",
-                "border-radius": "16px",
+                "border-right": "1px solid var(--border)",
             }
         )
 
@@ -32,8 +31,8 @@ class Sidebar(Column):
 
         # Tasks
         self._add_header("Tasks")
-        for task in self._tasks():
-            self._add_item(task.name())
+        for task in self._engine.cache.select_tasks():
+            self._add_item(task.name(), onclick=lambda: self._content.set(PageTask(self._engine, task)))
 
         # --------
         self._add_separator()

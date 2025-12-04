@@ -1,10 +1,87 @@
 from __future__ import annotations
 
+import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Literal, Mapping, Protocol, Self, TypeAlias
+from typing import Generic, Literal, Mapping, Protocol, Self, TypeAlias, TypeVar
 
 from bench.serialization import PlainData, Serializable
+
+T = TypeVar("T", bound=int | float | str)
+
+
+class Param(Generic[T]):
+    """Class containing information about a parameter.
+
+    Args:
+        name: Name of the parameter.
+        type: Type of the parameter.
+        default: Default value of the parameter.
+        description: Description of the parameter.
+        min: Minimum value of the parameter.
+        max: Maximum value of the parameter.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        type: type[T],
+        *,
+        default: T | None = None,
+        description: str | None = None,
+        min: int | float | None = None,
+        max: int | float | None = None,
+    ) -> None:
+        self._name = name
+        self._type = type
+        self._default = default
+        self._description = description
+        self._min = min
+        self._max = max
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def type(self) -> type[T]:
+        return self._type
+
+    @property
+    def default(self) -> T | None:
+        return self._default
+
+    @property
+    def description(self) -> str | None:
+        return self._description
+
+    @property
+    def min(self) -> int | float | None:
+        return self._min
+
+    @property
+    def max(self) -> int | float | None:
+        return self._max
+
+
+def _params_default(cls) -> list[Param]:
+    """Default implementation of `.params()` of `Task` and `Method` using type hints."""
+    params: list[Param] = []
+    signature = inspect.signature(cls.__init__)
+    for name, param in signature.parameters.items():
+        if name == "self":
+            continue
+        if param.kind is param.VAR_POSITIONAL or param.kind is param.VAR_KEYWORD:
+            continue
+        type = {
+            "bool": bool,
+            "int": int,
+            "float": float,
+            "str": str,
+        }.get(param.annotation, str)
+        default = param.default if param.default != param.empty else None
+        params.append(Param(name=name, type=type, default=default))
+    return params
 
 
 class Task(ABC, Serializable):
@@ -12,10 +89,17 @@ class Task(ABC, Serializable):
 
     @classmethod
     def name(cls) -> str:
+        """Name of the class of tasks."""
         return cls.__name__
 
+    @classmethod
+    def params(cls) -> list[Param]:
+        """Parameters to instantiate this task."""
+        return _params_default(cls)
+
     @abstractmethod
-    def metrics(self, result: Result) -> Metrics: ...
+    def metrics(self, result: Result) -> Metrics:
+        """Parse result into metrics."""
 
     @abstractmethod
     def encode(self) -> PlainData: ...
@@ -29,8 +113,14 @@ class Method(Serializable, Protocol):
     """Abstract base class for a method."""
 
     @classmethod
-    @abstractmethod
-    def name(cls) -> str: ...
+    def name(cls) -> str:
+        """Name of the class of methods."""
+        return cls.__name__
+
+    @classmethod
+    def params(cls) -> list[Param]:
+        """Parameters to instantiate this method."""
+        return _params_default(cls)
 
     @abstractmethod
     def encode(self) -> PlainData: ...

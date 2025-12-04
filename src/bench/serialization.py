@@ -36,7 +36,11 @@ def from_json(cls: type[S], data: str) -> S:
 
 def serializable_id(object: Serializable) -> str:
     if not hasattr(object, "_id"):
-        setattr(object, "_id", hashlib.sha256(json.dumps(object.encode(), sort_keys=True, ensure_ascii=True).encode()))
+        setattr(
+            object,
+            "_id",
+            hashlib.sha256(json.dumps(object.encode(), sort_keys=True, ensure_ascii=True).encode()).hexdigest()[:8],
+        )
     return getattr(object, "_id")
 
 

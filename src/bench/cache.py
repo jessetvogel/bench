@@ -66,19 +66,21 @@ class Cache:
     def insert_task(self, task: Task) -> None:
         """Insert task into database."""
         task_id = serializable_id(task)
+        task_type = task.name()
         task_blob = to_json(task).encode()
 
         cursor = self._db.cursor()
-        cursor.execute("INSERT INTO `tasks` VALUES (?, ?)", (task_id, task_blob))
+        cursor.execute("INSERT INTO `tasks` VALUES (?, ?, ?)", (task_id, task_type, task_blob))
         self._db.commit()
 
     def insert_method(self, method: Method) -> None:
         """Insert method into database."""
         method_id = serializable_id(method)
+        method_type = method.name()
         method_blob = to_json(method).encode()
 
         cursor = self._db.cursor()
-        cursor.execute("INSERT INTO `methods` VALUES (?, ?)", (method_id, method_blob))
+        cursor.execute("INSERT INTO `methods` VALUES (?, ?, ?)", (method_id, method_type, method_blob))
         self._db.commit()
 
     def insert_or_update_run(self, run: Run) -> None:
