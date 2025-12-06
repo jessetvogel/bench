@@ -3,8 +3,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from bench.serialization import from_json, serializable_id, to_json
+from bench.serialization import from_json, to_json
 from bench.templates import Bench, BenchError, Method, Result, Run, Task, Token
+from bench.utils import hash_serializable
 
 BENCH_CACHE = ".bench_cache"
 GITIGNORE = ".gitignore"
@@ -12,7 +13,7 @@ GITIGNORE = ".gitignore"
 SQL_INIT = [
     "CREATE TABLE `tasks` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
     "CREATE TABLE `methods` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
-    "CREATE TABLE `runs` (`id` INTEGER NOT NULL, `task` TEXT NOT NULL, `method` TEXT NOT NULL, `status` TEXT NOT NULL, `result` BLOB NOT NULL, PRIMARY KEY (`id`))",  # noqa: E501
+    "CREATE TABLE `runs` (`id` TEXT NOT NULL, `task` TEXT NOT NULL, `method` TEXT NOT NULL, `status` TEXT NOT NULL, `result` BLOB NOT NULL, PRIMARY KEY (`id`))",  # noqa: E501
 ]
 
 
@@ -64,104 +65,128 @@ class Cache:
     # PUBLIC API
 
     def insert_task(self, task: Task) -> None:
-        """Insert task into database."""
-        task_id = serializable_id(task)
+        """Insert task into database, if not already."""
+        task_id = hash_serializable(task)
+        cursor = self._db.cursor()
+        cursor.execute("SELECT 1 FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
+        if cursor.fetchone() is not None:
+            return
         task_type = task.name()
         task_blob = to_json(task).encode()
-
-        cursor = self._db.cursor()
         cursor.execute("INSERT INTO `tasks` VALUES (?, ?, ?)", (task_id, task_type, task_blob))
         self._db.commit()
 
     def insert_method(self, method: Method) -> None:
-        """Insert method into database."""
-        method_id = serializable_id(method)
+        """Insert method into database, if not already."""
+        method_id = hash_serializable(method)
+        cursor = self._db.cursor()
+        cursor.execute("SELECT 1 FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
+        if cursor.fetchone() is not None:
+            return
         method_type = method.name()
         method_blob = to_json(method).encode()
-
-        cursor = self._db.cursor()
         cursor.execute("INSERT INTO `methods` VALUES (?, ?, ?)", (method_id, method_type, method_blob))
         self._db.commit()
 
     def insert_or_update_run(self, run: Run) -> None:
         """Insert run into database, or update it if already in the database."""
         result_blob = to_json(run.result).encode()
-
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `runs` WHERE `id` = ? LIMIT 1", (run.id,))
-        if cursor.fetchone() is None:
-            # Insert
-            cursor.execute(
-                "INSERT INTO `runs` VALUES (?, ?, ?, ?, ?)",
-                (run.id, run.task_id, run.method_id, run.status, result_blob),
-            )
-        else:
+        if cursor.fetchone() is not None:
             # Update
             cursor.execute(
                 "UPDATE `runs` SET `status` = ?, `result` = ? WHERE `id` = ?",
                 (run.status, result_blob, run.id),
             )
+        else:
+            # Insert
+            cursor.execute(
+                "INSERT INTO `runs` VALUES (?, ?, ?, ?, ?)",
+                (run.id, run.task_id, run.method_id, run.status, result_blob),
+            )
         self._db.commit()
 
+    def select_task(self, task_id: str) -> Task:
+        """Get task by id."""
+        cursor = self._db.cursor()
+        cursor.execute("SELECT `type`, `data` FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
+        if (row := cursor.fetchone()) is None:
+            msg = f"Could not find task with id '{task_id}'"
+            raise ValueError(msg)
+        task_type_name, task_blob = row
+        assert isinstance(task_type_name, str)
+        assert isinstance(task_blob, bytes)
+        return self._parse_task(task_type_name, task_blob)
+
+    def select_method(self, method_id: str) -> Method:
+        """Get method by id."""
+        cursor = self._db.cursor()
+        cursor.execute("SELECT `type`, `data` FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
+        if (row := cursor.fetchone()) is None:
+            msg = f"Could not find method with id '{method_id}'"
+            raise ValueError(msg)
+        method_type_name, method_blob = row
+        assert isinstance(method_type_name, str)
+        assert isinstance(method_blob, bytes)
+        return self._parse_method(method_type_name, method_blob)
+
+    def select_run(self, run_id: str) -> Run:
+        """Get run by id."""
+        cursor = self._db.cursor()
+        cursor.execute("SELECT `task`, `method`, `status`, `result` FROM `runs` WHERE `id` = ? LIMIT 1", (run_id,))
+        if (row := cursor.fetchone()) is None:
+            msg = f"Could not find run with id `{run_id}`"
+            raise ValueError(msg)
+        task_id, method_id, status, result_blob = row
+        assert isinstance(task_id, str)
+        assert isinstance(method_id, str)
+        assert isinstance(status, str)
+        assert isinstance(result_blob, bytes)
+        return self._parse_run(run_id, task_id, method_id, status, result_blob)
+
     def select_tasks(self) -> list[Task]:
-        """Return all tasks that are present in the cache."""
+        """Get all tasks in the database."""
         tasks: list[Task] = []
         cursor = self._db.cursor()
         cursor.execute("SELECT `type`, `data` FROM `tasks`")
         while (row := cursor.fetchone()) is not None:
-            # TODO: WRAP IN TRY EXCEPT AND PRINT WARNING IF FAILS
-            task_type_name, blob = row
+            task_type_name, task_blob = row
             assert isinstance(task_type_name, str)
-            assert isinstance(blob, bytes)
-            task_type = self._get_task_type(task_type_name)
-            task = from_json(task_type, blob.decode())
-            tasks.append(task)
+            assert isinstance(task_blob, bytes)
+            tasks.append(self._parse_task(task_type_name, task_blob))
         return tasks
 
     def select_methods(self) -> list[Method]:
-        """Return all methods that are present in the cache."""
+        """Get all methods in the database."""
         methods: list[Method] = []
         cursor = self._db.cursor()
         cursor.execute("SELECT `type`, `data` FROM `methods`")
         while (row := cursor.fetchone()) is not None:
-            # TODO: WRAP IN TRY EXCEPT AND PRINT WARNING IF FAILS
-            method_type_name, blob = row
+            method_type_name, method_blob = row
             assert isinstance(method_type_name, str)
-            assert isinstance(blob, bytes)
-            method_type = self._get_method_type(method_type_name)
-            method = from_json(method_type, blob.decode())
-            methods.append(method)
+            assert isinstance(method_blob, bytes)
+            methods.append(self._parse_method(method_type_name, method_blob))
         return methods
 
     def select_runs(self, task: Task) -> list[Run]:
-        task_id = serializable_id(task)
-
+        """Get all runs associated to the given task."""
+        task_id = hash_serializable(task)
         runs: list[Run] = []
         cursor = self._db.cursor()
         cursor.execute("SELECT `id`, `method`, `status`, `result` FROM `runs` WHERE `task` = ?", (task_id,))
         while (row := cursor.fetchone()) is not None:
             run_id, method_id, status, result_blob = row
-            assert isinstance(run_id, int)
+            assert isinstance(run_id, str)
             assert isinstance(method_id, str)
             assert isinstance(status, str)
             assert isinstance(result_blob, bytes)
-
-            result: Token | Result | BenchError
-            if status == "running":
-                result = from_json(Token, result_blob.decode())
-            elif status == "done":
-                result = from_json(Result, result_blob.decode())
-            elif status == "failed":
-                result = from_json(BenchError, result_blob.decode())
-            else:
-                msg = f"Encountered status '{status}', expected 'running', 'done' or 'failed'"
-                raise RuntimeError(msg)
-
-            runs.append(Run(run_id, task_id, method_id, result))
-
+            run = self._parse_run(run_id, task_id, method_id, status, result_blob)
+            runs.append(run)
         return runs
 
     def _get_task_type(self, name: str) -> type[Task]:
+        """Get task type by name."""
         if not hasattr(self, "_task_types"):
             self._task_types = {task_type.name(): task_type for task_type in self._bench.task_types()}
         if name not in self._task_types:
@@ -170,9 +195,33 @@ class Cache:
         return self._task_types[name]
 
     def _get_method_type(self, name: str) -> type[Method]:
+        """Get method type by name."""
         if not hasattr(self, "_method_types"):
             self._method_types = {method_type.name(): method_type for method_type in self._bench.method_types()}
         if name not in self._method_types:
             msg = f"Unknown method type '{name}'"
             raise ValueError(msg)
         return self._method_types[name]
+
+    def _parse_task(self, task_type_name: str, task_blob: bytes) -> Task:
+        task_type = self._get_task_type(task_type_name)
+        return from_json(task_type, task_blob.decode())
+
+    def _parse_method(self, method_type_name: str, method_blob: bytes) -> Method:
+        method_type = self._get_method_type(method_type_name)
+        return from_json(method_type, method_blob.decode())
+
+    def _parse_run(self, run_id: str, task_id: str, method_id: str, status: str, result_blob: bytes) -> Run:
+        result: None | Token | Result | BenchError
+        if status == "pending":
+            result = None
+        elif status == "running":
+            result = from_json(Token, result_blob.decode())
+        elif status == "done":
+            result = from_json(Result, result_blob.decode())
+        elif status == "failed":
+            result = from_json(BenchError, result_blob.decode())
+        else:
+            msg = f"Encountered status '{status}', expected 'running', 'done' or 'failed'"
+            raise RuntimeError(msg)
+        return Run(run_id, task_id, method_id, result)

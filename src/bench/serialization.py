@@ -1,4 +1,3 @@
-import hashlib
 import json
 from typing import Protocol, Self, TypeAlias, TypeVar
 
@@ -24,24 +23,16 @@ class Serializable(Protocol):
 S = TypeVar("S", bound=Serializable)
 
 
-def to_json(object: Serializable) -> str:
+def to_json(object: Serializable | None) -> str:
     """Serialize object into JSON."""
+    if object is None:
+        return "null"
     return json.dumps(object.encode())
 
 
 def from_json(cls: type[S], data: str) -> S:
     """Deserialize JSON into object."""
     return cls.decode(json.loads(data))
-
-
-def serializable_id(object: Serializable) -> str:
-    if not hasattr(object, "_id"):
-        setattr(
-            object,
-            "_id",
-            hashlib.sha256(json.dumps(object.encode(), sort_keys=True, ensure_ascii=True).encode()).hexdigest()[:8],
-        )
-    return getattr(object, "_id")
 
 
 # TODO: Create class `SerializableData` that implements a default `encode` and `decode` class

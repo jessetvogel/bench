@@ -149,7 +149,7 @@ class Token(Serializable):
 
 
 class Result(Serializable):
-    """Protocol for a result."""
+    """Result class."""
 
     def __init__(self, data: Mapping[str, PlainData]) -> None:
         self._data = dict(data)
@@ -214,18 +214,18 @@ class BenchError(Exception, Serializable):
         return cls(data)
 
 
-RunStatus: TypeAlias = Literal["running", "done", "failed"]
+RunStatus: TypeAlias = Literal["pending", "running", "done", "failed"]
 
 
 class Run:
-    def __init__(self, id: int, task_id: str, method_id: str, result: Token | Result | BenchError) -> None:
+    def __init__(self, id: str, task_id: str, method_id: str, result: None | Token | Result | BenchError) -> None:
         self._id = id
         self._task_id = task_id
         self._method_id = method_id
         self._result = result
 
     @property
-    def id(self) -> int:
+    def id(self) -> str:
         return self._id
 
     @property
@@ -237,15 +237,17 @@ class Run:
         return self._method_id
 
     @property
-    def result(self) -> Token | Result | BenchError:
+    def result(self) -> None | Token | Result | BenchError:
         return self._result
 
     @result.setter
-    def result(self, result: Token | Result | BenchError) -> None:
+    def result(self, result: None | Token | Result | BenchError) -> None:
         self._result = result
 
     @property
     def status(self) -> RunStatus:
+        if self.result is None:
+            return "pending"
         if isinstance(self.result, Token):
             return "running"
         if isinstance(self.result, Result):
@@ -253,7 +255,7 @@ class Run:
         if isinstance(self.result, BenchError):
             return "failed"
 
-        msg = f"Expected result of run to be `Token`, `Result` or `BenchError`, got `{type(self.result)}`"
+        msg = f"Expected result of run to be `None`, `Token`, `Result` or `BenchError`, got `{type(self.result)}`"
         raise ValueError(msg)
 
 

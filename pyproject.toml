@@ -29,7 +29,8 @@ dependencies = ["slash @ git+https://github.com/jessetvogel/slash.git@main"]
 dev = ["ruff", "mypy", "pytest"]
 
 [project.scripts]
-bench-dashboard = "bench.dashboard.main:main"
+bench-dashboard = "bench.main:main_dashboard"
+bench-run = "bench.main:main_run"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

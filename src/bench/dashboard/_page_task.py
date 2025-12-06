@@ -24,7 +24,22 @@ class PageTask(Div):
         self.append(Button("Create experiment").onclick(self._create_experiment))
 
         self.append(H3("Compare methods"))
-        # runs = self._engine.cache.select_runs(self._task)
+
+        runs = self._engine.cache.select_runs(self._task)
+
+        for run in runs:
+            task = self._engine.cache.select_task(run.task_id)
+            method = self._engine.cache.select_method(run.method_id)
+
+            self.append(
+                Div(
+                    Div(f"ID: {run.id}"),
+                    Div(f"Task: {task.name()}"),
+                    Div(f"Method: {method.name()}"),
+                    Div(f"Status: {run.status}"),
+                    Div(f"Result: {to_json(run.result)}"),
+                ).style({"border": "1px solid red", "padding": "8px", "margin-bottom": "8px"})
+            )
 
     def _create_experiment(self) -> None:
         DialogNewExperiment(self._engine, self._task).mount().show_modal()
@@ -62,6 +77,8 @@ class DialogNewExperiment(Dialog):
             )
 
             self.unmount()
+
+            self._engine.create_run(self._task, method)
 
         self.append(H3(f"Create experiment for {self._task.name()}"))
         self.append(
