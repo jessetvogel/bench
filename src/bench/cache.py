@@ -71,7 +71,7 @@ class Cache:
         cursor.execute("SELECT 1 FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
         if cursor.fetchone() is not None:
             return
-        task_type = task.name()
+        task_type = task.type_name()
         task_blob = to_json(task).encode()
         cursor.execute("INSERT INTO `tasks` VALUES (?, ?, ?)", (task_id, task_type, task_blob))
         self._db.commit()
@@ -83,7 +83,7 @@ class Cache:
         cursor.execute("SELECT 1 FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
         if cursor.fetchone() is not None:
             return
-        method_type = method.name()
+        method_type = method.type_name()
         method_blob = to_json(method).encode()
         cursor.execute("INSERT INTO `methods` VALUES (?, ?, ?)", (method_id, method_type, method_blob))
         self._db.commit()
@@ -188,7 +188,7 @@ class Cache:
     def _get_task_type(self, name: str) -> type[Task]:
         """Get task type by name."""
         if not hasattr(self, "_task_types"):
-            self._task_types = {task_type.name(): task_type for task_type in self._bench.task_types()}
+            self._task_types = {task_type.type_name(): task_type for task_type in self._bench.task_types()}
         if name not in self._task_types:
             msg = f"Unknown task type '{name}'"
             raise ValueError(msg)
@@ -197,7 +197,7 @@ class Cache:
     def _get_method_type(self, name: str) -> type[Method]:
         """Get method type by name."""
         if not hasattr(self, "_method_types"):
-            self._method_types = {method_type.name(): method_type for method_type in self._bench.method_types()}
+            self._method_types = {method_type.type_name(): method_type for method_type in self._bench.method_types()}
         if name not in self._method_types:
             msg = f"Unknown method type '{name}'"
             raise ValueError(msg)

@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import cast
 
 from bench.dashboard import Dashboard
-from bench.engine import create_engine_from_module
+from bench.engine import Engine
 from bench.logging import get_logger
 
 
@@ -19,14 +19,13 @@ def main_dashboard() -> None:
     args = parser.parse_args()
     path = Path(cast(str, args.path))
 
-    # Create Engine instance
     try:
-        engine = create_engine_from_module(path)
+        # Create engine
+        engine = Engine(path)
+        # Start dashboard
+        Dashboard(engine).run()
     except Exception as err:
-        logger.error(f"{err}")
-
-    # Start dashboard
-    Dashboard(engine).run()
+        logger.error(f"({type(err).__name__}) {err}")
 
 
 def main_run() -> None:
@@ -43,11 +42,10 @@ def main_run() -> None:
     path = Path(cast(str, args.path))
     run_id = cast(str, args.run_id)
 
-    # Create Engine instance
     try:
-        engine = create_engine_from_module(path)
+        # Create engine
+        engine = Engine(path)
+        # Start run
+        engine.execute_run(run_id)
     except Exception as err:
-        logger.error(f"{err}")
-
-    # Start run
-    engine.execute_run(run_id)
+        logger.error(f"({type(err).__name__}) {err}")

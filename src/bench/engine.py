@@ -1,7 +1,5 @@
 import importlib.util
-import inspect
 import secrets
-import time
 from pathlib import Path
 
 from bench.cache import Cache
@@ -12,10 +10,16 @@ from bench.utils import hash_serializable
 
 
 class Engine:
-    """Engine / API"""
+    """Engine / API
 
-    def __init__(self, bench: Bench) -> None:
-        self._bench = bench
+    Args:
+        path: Path to Python module containing :py:class:`Bench` instance.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._logger = get_logger("bench")
+        self._bench = load_bench(path)
 
     @property
     def bench(self) -> Bench:
@@ -37,12 +41,15 @@ class Engine:
         task = task_type(**kwargs)
         self.cache.insert_task(task)
 
-    def create_run(self, task: Task, method: Method) -> None:
+    def create_run(self, task: Task, method: Method) -> Process:
         """Create run based on the given task and method.
 
         Args:
             task: Task to execute.
             method: Method to apply to task.
+
+        Returns:
+            A :py:class:`Process` instance that executes the run.
         """
         # Make sure task and method are in the database
         self.cache.insert_task(task)
@@ -57,22 +64,8 @@ class Engine:
         )
         self.cache.insert_or_update_run(run)
 
-        print(f"STARTING RUN WITH ID = {run.id}")
-        print(f"METHOD TYPE = {method.name()}")
-
-        # TODO: Execute as a separate process!
-        process = Process(["bench-run", "main.py", run.id])
-
-        logger = get_logger("bench")
-
-        while process.poll() is None:
-            logger.debug("Waiting for subprocess ..")
-            logger.debug(f" > stdout: {process.stdout}")
-            time.sleep(0.5)
-
-        logger.debug(f" > stdout: {process.stdout}")
-
-        logger.debug("Subprocess completed!")
+        # Execute the run as a separate process
+        return Process(["bench-run", str(self._path), run.id])
 
     def execute_run(self, run_id: str) -> None:
         run = self.cache.select_run(run_id)
@@ -81,49 +74,38 @@ class Engine:
             raise ValueError(msg)
         task = self.cache.select_task(run.task_id)
         method = self.cache.select_method(run.method_id)
-
-        print(f"EXECUTING RUN WITH TASK {task.name()} AND METHOD {method.name()}")
-
         run.result = self._bench.run(task, method)
         self.cache.insert_or_update_run(run)
 
 
-def create_engine_from_module(path: Path) -> Engine:
-    """Create :py:class:`Engine` using the :py:class:`Bench` instance in the module given by the path.
+def load_bench(path: Path) -> Bench:
+    """Load :py:class:`Bench` instance from the module given by the provided path.
 
     Args:
         path: Path to Python module containing :py:class:`Bench` instance.
 
     Returns:
-        An :py:class:`Engine` instance.
+        A :py:class:`Bench` instance.
     """
+    if not path.exists():
+        msg = f"File '{path}' does not exist"
+        raise FileNotFoundError(msg)
+
+    # Load module
     module_name = path.stem
     spec = importlib.util.spec_from_file_location(module_name, path)
-
     if spec is None:
-        msg = f"Failed to load '{path}'"
+        msg = f"Failed to load module '{path}'"
         raise ValueError(msg)
-
     module = importlib.util.module_from_spec(spec)
-    # sys.modules[module_name] = module  # optional but avoids edge cases TODO: necessary ?
-    if spec.loader is None:
-        msg = "spec.loader is none, why?"
-        raise RuntimeError(msg)
-
+    # sys.modules[module_name] = module  # TODO: is this necessary ?
+    assert spec.loader is not None  # TODO: can `spec.loader` be `None` ?
     spec.loader.exec_module(module)
 
+    # Find `Bench` instance
     for _, object in vars(module).items():
-        if not inspect.isclass(object):
-            continue
-        if not issubclass(object, Bench):
-            continue
-        if object is Bench:
-            continue
-        if object.__module__ != module.__name__:
-            continue
-
-        bench = object()
-        return Engine(bench)
+        if isinstance(object, Bench):
+            return object
 
     msg = f"Python module '{path}' contains no instance of `Bench`"
     raise ValueError(msg)

@@ -1,12 +1,17 @@
+from functools import partial
 from typing import Any, Awaitable, Callable
 
 from slash.core import Children, Elem, Session
+from slash.events import ClickEvent
 from slash.html import Div
 from slash.layout import Column, Row
 from slash.reactive import Signal
 
+from bench.dashboard._page_new_task import PageNewTask
 from bench.dashboard._page_task import PageTask
+from bench.dashboard.icons import icon_oplus
 from bench.engine import Engine
+from bench.templates import Task
 
 
 class Sidebar(Column):
@@ -32,7 +37,14 @@ class Sidebar(Column):
         # Tasks
         self._add_header("Tasks")
         for task in self._engine.cache.select_tasks():
-            self._add_item(task.name(), onclick=lambda: self._content.set(PageTask(self._engine, task)))
+
+            def handle_click(event: ClickEvent, task: Task):
+                Session.require().log(f"task = {task.encode()}")
+                self._content.set(PageTask(self._engine, task))
+
+            self._add_item(task.label(), onclick=partial(handle_click, task=task))
+
+        self._add_item(icon_oplus(), "create new task", onclick=lambda: self._content.set(PageNewTask(self._engine)))
 
         # --------
         self._add_separator()
@@ -54,9 +66,8 @@ class Sidebar(Column):
                     "height": "40px",
                     "line-height": "40px",
                     "padding": "0px 8px",
-                    "color": "var(--text-muted)",
-                    "font-variant": "small-caps",
-                    "letter-spacing": "1px",
+                    # "color": "var(--text-muted)",
+                    "font-weight": "bold",
                 }
             )
         )

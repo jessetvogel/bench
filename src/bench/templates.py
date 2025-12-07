@@ -3,8 +3,9 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Generic, Literal, Mapping, Protocol, Self, TypeAlias, TypeVar
+from typing import Generic, Iterator, Literal, Mapping, Protocol, Self, TypeAlias, TypeVar
 
+from bench.metrics import Metric
 from bench.serialization import PlainData, Serializable
 
 T = TypeVar("T", bound=int | float | str)
@@ -88,7 +89,7 @@ class Task(ABC, Serializable):
     """Abstract base class for a task."""
 
     @classmethod
-    def name(cls) -> str:
+    def type_name(cls) -> str:
         """Name of the class of tasks."""
         return cls.__name__
 
@@ -96,6 +97,10 @@ class Task(ABC, Serializable):
     def params(cls) -> list[Param]:
         """Parameters to instantiate this task."""
         return _params_default(cls)
+
+    def label(self) -> str:
+        """Display name of the task."""
+        return self.type_name()
 
     @abstractmethod
     def metrics(self, result: Result) -> Metrics:
@@ -113,7 +118,7 @@ class Method(Serializable, Protocol):
     """Abstract base class for a method."""
 
     @classmethod
-    def name(cls) -> str:
+    def type_name(cls) -> str:
         """Name of the class of methods."""
         return cls.__name__
 
@@ -121,6 +126,10 @@ class Method(Serializable, Protocol):
     def params(cls) -> list[Param]:
         """Parameters to instantiate this method."""
         return _params_default(cls)
+
+    def label(self) -> str:
+        """Display name of the method."""
+        return self.type_name()
 
     @abstractmethod
     def encode(self) -> PlainData: ...
@@ -172,22 +181,20 @@ class Result(Serializable):
 class Metrics:
     """Metrics computed from a result for a task."""
 
-    def __init__(self, data: Mapping[str, PlainData]) -> None:
-        self._data = dict(data)
+    def __init__(self, **metrics: Metric) -> None:
+        self._data = metrics
 
-    def __getitem__(self, index: str) -> PlainData:
+    def __getitem__(self, index: str) -> Metric:
         return self._data[index]
 
-    def __setitem__(self, index: str, value: PlainData) -> None:
+    def __setitem__(self, index: str, value: Metric) -> None:
         self._data[index] = value
 
-    def encode(self) -> PlainData:
-        return dict(self._data)
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
 
-    @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        assert isinstance(data, dict)
-        return cls(data)
+    def items(self) -> Iterable[tuple[str, Metric]]:
+        return self._data.items()
 
 
 class BenchError(Exception, Serializable):

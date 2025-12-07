@@ -16,10 +16,10 @@ class PageNewTask(Div):
 
     def _setup(self) -> None:
         for task_type in self._engine.bench.task_types():
-            self.append(Button(task_type.name()).onclick(lambda: self._create_task(task_type)))
+            self.append(Button(task_type.type_name()).onclick(lambda: self._create_task(task_type)))
 
     def _create_task(self, task_type: type[Task]) -> None:
-        Session.require().log(f"Creating task of type {task_type.name()}")
+        Session.require().log(f"Creating task of type {task_type.type_name()}")
 
         params = task_type.params()
 
@@ -28,7 +28,7 @@ class PageNewTask(Div):
             self._engine.create_task(task_type, **values)
 
         prompt(
-            f"Create new {task_type.name()}",
+            f"Create new {task_type.type_name()}",
             "Fill in parameters please",
             params,
             handler=handler,
