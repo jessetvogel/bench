@@ -1,11 +1,12 @@
 import importlib.util
 import secrets
 from pathlib import Path
+from typing import Any
 
 from bench.cache import Cache
 from bench.logging import get_logger
 from bench.process import Process
-from bench.templates import Bench, Method, Run, Task
+from bench.templates import Bench, Method, Result, Run, Task
 from bench.utils import hash_serializable
 
 
@@ -76,6 +77,18 @@ class Engine:
         method = self.cache.select_method(run.method_id)
         run.result = self._bench.run(task, method)
         self.cache.insert_or_update_run(run)
+
+    def evaluate_run(self, run: Run) -> dict[str, Any]:
+        if not isinstance(run.result, Result):
+            msg = f"Expected run with status 'done', but got {run.status}"
+            raise ValueError(msg)
+
+        if not hasattr(run, "_metrics"):
+            task = self.cache.select_task(run.task_id)
+            metrics = task.evaluate(run.result)
+            setattr(run, "_metrics", metrics)
+
+        return getattr(run, "_metrics")
 
 
 def load_bench(path: Path) -> Bench:

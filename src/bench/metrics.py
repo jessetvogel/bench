@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from datetime import timedelta
+from dataclasses import dataclass
 from types import MappingProxyType
 
 
@@ -15,13 +15,18 @@ class Table(Metric):
         return MappingProxyType(self._data)
 
 
+@dataclass(init=False)
 class Time(Metric):
-    def __init__(self, **kwargs: timedelta) -> None:
-        self._data = kwargs
+    keys: tuple[str, ...]
 
-    def data(self) -> Mapping[str, timedelta]:
-        return MappingProxyType(self._data)
+    def __init__(self, *keys: str) -> None:
+        self.keys = keys
 
 
+@dataclass
 class Graph(Metric):
-    pass
+    keys_xs: str
+    keys_ys: str
+    title: str | None = None
+    xlabel: str | None = None
+    ylabel: str | None = None

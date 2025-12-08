@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from slash.core import Handler, Session
 from slash.html import Button, Dialog, Div, Input, Span
 from slash.layout import Column, Row
@@ -66,39 +68,20 @@ def prompt(
     dialog.show_modal()
 
 
-class Form(Div):
-    def __init__(self, params: list[Param]) -> None:
-        super().__init__()
-        self._params = {param.name: param for param in params}
-        self._setup()
-
-    def _setup(self) -> None:
-        # Create inputs
-        self._inputs: dict[str, Input] = {}
-        for name, param in self._params.items():
-            self._inputs[name] = (input := Input())
-            input.type = INPUT_TYPE.get(param.type, "text")
-            if param.default is not None:
-                input.value = str(param.default)
-
-        # Create grid of inputs
-        self.append(
-            Column(
-                Div(*[[Span(name), self._inputs[name]] for name in self._params]).style(
-                    {
-                        "display": "grid",
-                        "grid-template-columns": "repeat(2, auto)",
-                        "align-items": "center",
-                        "gap": "8px",
-                    }
-                ),
-            ).style({"gap": "16px"})
-        )
-
-    def value(self, param: Param) -> int | float | str:
-        value = self._inputs[param.name].value
-        if param.type is int:
-            return int(value)
-        if param.type is float:
-            return float(value)
-        return str(value)
+def timedelta_to_str(t: timedelta) -> str:
+    """Format timedelta into read-friendly format."""
+    seconds = t.total_seconds()
+    if seconds < 1:
+        milliseconds = round(seconds * 1e3)
+        return f"{milliseconds} ms"
+    elif seconds < 60:
+        return f"{seconds:.1f} sec"
+    elif seconds < 60 * 60:
+        seconds = round(seconds)
+        return f"{seconds // 60} min {seconds % 60} sec"
+    elif seconds < 60 * 60 * 24:
+        minutes = round(seconds / 60)
+        return f"{minutes // 60} hrs {minutes % 60} min"
+    else:
+        hours = round(seconds / 60 / 60)
+        return f"{hours // 24} days {hours % 24} hrs"

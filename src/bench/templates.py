@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from typing import Generic, Iterator, Literal, Mapping, Protocol, Self, TypeAlias, TypeVar
+from typing import Any, Generic, Iterator, Literal, Mapping, Protocol, Self, TypeVar
 
 from bench.metrics import Metric
 from bench.serialization import PlainData, Serializable
@@ -102,9 +102,14 @@ class Task(ABC, Serializable):
         """Display name of the task."""
         return self.type_name()
 
+    @classmethod
     @abstractmethod
-    def metrics(self, result: Result) -> Metrics:
+    def metrics(self) -> Metrics:
         """Parse result into metrics."""
+
+    @abstractmethod
+    def evaluate(self, result: Result) -> dict[str, Any]:
+        """Evaluate the result into metrics."""
 
     @abstractmethod
     def encode(self) -> PlainData: ...
@@ -221,9 +226,6 @@ class BenchError(Exception, Serializable):
         return cls(data)
 
 
-RunStatus: TypeAlias = Literal["pending", "running", "done", "failed"]
-
-
 class Run:
     def __init__(self, id: str, task_id: str, method_id: str, result: None | Token | Result | BenchError) -> None:
         self._id = id
@@ -252,7 +254,7 @@ class Run:
         self._result = result
 
     @property
-    def status(self) -> RunStatus:
+    def status(self) -> Literal["pending", "running", "done", "failed"]:
         if self.result is None:
             return "pending"
         if isinstance(self.result, Token):
