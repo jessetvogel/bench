@@ -1,7 +1,7 @@
 import importlib.util
 import secrets
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from bench.cache import Cache
 from bench.logging import get_logger
@@ -21,6 +21,7 @@ class Engine:
         self._path = path
         self._logger = get_logger("bench")
         self._bench = load_bench(path)
+        self._processes: list[tuple[Task, Method, Process]] = []
 
     @property
     def bench(self) -> Bench:
@@ -34,6 +35,11 @@ class Engine:
             self._cache = Cache(self._bench)
         return self._cache
 
+    @property
+    def processes(self) -> Iterable[tuple[Task, Method, Process]]:
+        """Currently running processes."""
+        return tuple(self._processes)
+
     def create_task(self, task_type: type[Task], **kwargs: int | float | str) -> None:
         """Create task of given type with given arguments.
 
@@ -42,15 +48,12 @@ class Engine:
         task = task_type(**kwargs)
         self.cache.insert_task(task)
 
-    def create_run(self, task: Task, method: Method) -> Process:
-        """Create run based on the given task and method.
+    def launch_run(self, task: Task, method: Method) -> None:
+        """Launch new process to execute a run based on the given task and method.
 
         Args:
             task: Task to execute.
             method: Method to apply to task.
-
-        Returns:
-            A :py:class:`Process` instance that executes the run.
         """
         # Make sure task and method are in the database
         self.cache.insert_task(task)
@@ -66,15 +69,22 @@ class Engine:
         self.cache.insert_or_update_run(run)
 
         # Execute the run as a separate process
-        return Process(["bench-run", str(self._path), run.id])
+        process = Process(["bench-run", str(self._path), run.id])
+        self._processes.append((task, method, process))
 
     def execute_run(self, run_id: str) -> None:
+        """Execute run with given id.
+
+        Args:
+            run_id: ID of the run to execute.
+        """
         run = self.cache.select_run(run_id)
         if run.status != "pending":
-            msg = f"Expected run '{run_id}' to be pending, but is {run.status}"
+            msg = f"Expected run {run_id} to be pending, but is {run.status}"
             raise ValueError(msg)
         task = self.cache.select_task(run.task_id)
         method = self.cache.select_method(run.method_id)
+        self._logger.info(f"Executing run {run_id} ..")
         run.result = self._bench.run(task, method)
         self.cache.insert_or_update_run(run)
 

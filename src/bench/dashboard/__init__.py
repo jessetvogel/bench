@@ -33,6 +33,6 @@ class Dashboard:
         )
         content = Signal[Elem](PageNewTask(self._engine))
         Effect(lambda: content_elem.clear().append(content()))
-        menu = Menu(self._engine, content)
+        menu = Menu(self._engine, content).style({"flex-shrink": "0"})
 
         return Row(menu, content_elem)

@@ -47,5 +47,7 @@ def main_run() -> None:
         engine = Engine(path)
         # Start run
         engine.execute_run(run_id)
+        # Done
+        logger.info("Done!")
     except Exception as err:
         logger.error(f"({type(err).__name__}) {err}")

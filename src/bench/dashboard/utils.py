@@ -1,7 +1,10 @@
+from collections.abc import Callable
 from datetime import timedelta
 
-from slash.core import Handler, Session
+from slash.core import Elem, Handler, Session
+from slash.events import ClickEvent, SupportsOnClick
 from slash.html import Button, Dialog, Div, Input, Span
+from slash.js import JSFunction
 from slash.layout import Column, Row
 
 from bench.templates import Param
@@ -85,3 +88,38 @@ def timedelta_to_str(t: timedelta) -> str:
     else:
         hours = round(seconds / 60 / 60)
         return f"{hours // 24} days {hours % 24} hrs"
+
+
+_JS_TIMER = JSFunction(
+    ["id", "t"],
+    """
+setTimeout(function () {
+    const elem = document.getElementById(id);
+    if (elem !== null) elem.click();
+}, t);
+    """,
+)
+
+
+class Timer(Elem, SupportsOnClick):
+    """Invisible element that calls a callback after some time."""
+
+    def __init__(self, callback: Callable[[], None], seconds: float, *, repeat: bool = False) -> None:
+        super().__init__("div")
+
+        self._callback = callback
+        self._seconds = seconds
+        self._repeat = repeat
+
+        self.style({"display": "none"})
+        self.onclick(self._handle_click)
+
+        self._start_timer()
+
+    def _start_timer(self) -> None:
+        Session.require().execute(_JS_TIMER, [self.id, self._seconds * 1000.0])
+
+    def _handle_click(self, event: ClickEvent) -> None:
+        self._callback()
+        if self._repeat:
+            self._start_timer()

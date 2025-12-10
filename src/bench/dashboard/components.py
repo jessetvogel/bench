@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
@@ -10,16 +9,17 @@ from slash.basic import Axes, Checkbox
 from slash.basic import Graph as SlashGraph
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
-from slash.html import H2, H3, Button, Code, Dialog, Div, Input, Option, Pre, Select, Span
+from slash.html import H2, H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, P, Pre, Select, Span, Summary
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
+from bench.dashboard.ansi import ansi2html
 from bench.dashboard.icons import icon_oplus
-from bench.dashboard.utils import prompt, timedelta_to_str
+from bench.dashboard.utils import Timer, prompt, timedelta_to_str
 from bench.engine import Engine
 from bench.metrics import Graph, Metric, Table, Time
-from bench.serialization import to_json
-from bench.templates import Param, Run, Task
+from bench.process import Process
+from bench.templates import Method, Param, Run, Task
 
 
 class Menu(Column):
@@ -38,7 +38,7 @@ class Menu(Column):
                 "height": "100dvh",
                 "background-color": "var(--bg)",
                 "box-shadow": "var(--shadow)",
-                "border-right": "1px solid var(--border)",
+                "border-right": "1px solid var(--border-muted)",
             }
         )
 
@@ -48,9 +48,8 @@ class Menu(Column):
         self._add_header("Tasks")
         for task in self._engine.cache.select_tasks():
 
-            def handle_click(event: ClickEvent, task: Task):
-                Session.require().log(f"task = {task.encode()}")
-                self._content.set(PageTask(self._engine, task))
+            def handle_click(event: ClickEvent, task: Task) -> None:
+                self._click_task(task)
 
             self._add_item(task.label(), onclick=partial(handle_click, task=task))
 
@@ -62,6 +61,7 @@ class Menu(Column):
         # Info
         self._add_header("Info")
         self._add_item("About")
+        self._add_item("Processes", onclick=self._click_processes)
 
         # Theme
         self._add_theme_buttons()
@@ -122,9 +122,11 @@ class Menu(Column):
             ).style({"margin": "auto 0px 8px 0px", "justify-content": "center", "gap": "32px"})
         )
 
-    def _click_task(self, task: str) -> None:
-        # self._set_content(BenchmarkPage(benchmark))
-        pass
+    def _click_task(self, task: Task) -> None:
+        self._content.set(PageTask(self._engine, task))
+
+    def _click_processes(self) -> None:
+        self._content.set(PageProcesses(self._engine))
 
 
 class PageNewTask(Div):
@@ -138,12 +140,9 @@ class PageNewTask(Div):
             self.append(Button(task_type.type_name()).onclick(lambda: self._create_task(task_type)))
 
     def _create_task(self, task_type: type[Task]) -> None:
-        Session.require().log(f"Creating task of type {task_type.type_name()}")
-
         params = task_type.params()
 
         def handler(values: dict[str, int | float | str]):
-            Session.require().log(json.dumps(values))
             self._engine.create_task(task_type, **values)
 
         prompt(
@@ -152,6 +151,79 @@ class PageNewTask(Div):
             params,
             handler=handler,
         )
+
+
+class PageProcesses(Div):
+    def __init__(self, engine: Engine) -> None:
+        super().__init__()
+        self._engine = engine
+        self._setup()
+
+    def _setup(self) -> None:
+        self.append(H3("Processes"))
+        self.append(P("This page shows the most recent processes."))
+
+        self.append(
+            Column(
+                [self._process_panel(task, method, process) for task, method, process in self._engine.processes]
+            ).style({"gap": "16px"})
+        )
+
+        if not self._engine.processes:
+            self.append(Span("There are currently no processes running.").style({"font-style": "italic"}))
+
+    def _process_status(self, status: int | None) -> Span:
+        if status is None:
+            return Span("Running..").style({"font-style": "italic"})
+        if status == 0:
+            return Span("Done").style({"font-weight": "bold", "color": "var(--green)"})
+        else:
+            return Span("Failed").style({"font-weight": "bold", "color": "var(--red)"})
+
+    def _process_panel(self, task: Task, method: Method, process: Process) -> Panel:
+        status = Signal(process.poll())
+        stdout = Signal(process.stdout)
+
+        stdout_html = HTML("")
+        Effect(lambda: stdout_html.set_html(ansi2html(stdout())))
+
+        status_span = Span()
+        Effect(lambda: status_span.clear().append(self._process_status(status())))
+
+        def timer_callback() -> None:
+            status.set(process.poll())
+            stdout.set(process.stdout)
+
+            if status() is not None:
+                timer.unmount()
+
+        timer = Timer(timer_callback, 1.0, repeat=True)
+
+        return Panel(
+            Div(
+                Span("Task").style({"font-weight": "bold"}),
+                Span(task.label()),
+                Span("Method").style({"font-weight": "bold"}),
+                Span(method.label()),
+                Span("Status").style({"font-weight": "bold"}),
+                status_span,
+            ).style(
+                {
+                    "display": "grid",
+                    "grid-template-columns": "repeat(2, max-content)",
+                    "grid-gap": "8px 16px",
+                    "margin-bottom": "16px",
+                    "align-items": "start",
+                }
+            ),
+            Div(
+                Details(
+                    Summary("Output").style({"font-weight": "bold"}),
+                    Pre(Code(stdout_html).style({"padding": "16px"})),
+                    timer,
+                )
+            ),
+        ).style({"max-width": "640px"})
 
 
 class PageTask(Div):
@@ -205,7 +277,7 @@ class PageTask(Div):
         self.append(
             Div(
                 [create_metric_elem(self._engine, name, metric, selected_groups) for name, metric in metrics.items()]
-            ).style({"display": "flex"})
+            ).style({"display": "flex", "gap": "16px", "justify-content": "center", "flex-wrap": "wrap"})
         )
 
     def _create_experiment(self) -> None:
@@ -398,24 +470,14 @@ class DialogNewExperiment(Dialog):
             method_type = method_types[select.value]
             form_wrapper.clear()
             form_wrapper.append(Form(method_type.params()))
-            start.disabled = None  # TODO: SHOULD SUPPORT `False`
+            start.disabled = False
 
         def handle_click_start() -> None:
             method_type = method_types[select.value]
-            Session.require().log(method_type.type_name())
-
             form = cast(Form, form_wrapper.children[0])
             method = method_type(**{param.name: form.value(param) for param in method_type.params()})
-
-            Session.require().log(  # TODO: REMOVE THIS
-                "Create experiment",
-                level="debug",
-                details=Div(Span(method_type.type_name()), Pre(Code(to_json(method)))),
-            )
-
             self.unmount()
-
-            self._engine.create_run(self._task, method)
+            self._engine.launch_run(self._task, method)
 
         self.append(H3(f"Create experiment for {self._task.type_name()}"))
         self.append(
