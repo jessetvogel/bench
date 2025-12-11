@@ -276,7 +276,7 @@ class PageProcess(Div):
                     Summary("Output").style({"font-weight": "bold"}),
                     Pre(Code(stdout_html).style({"padding": "16px"})),
                     timer,
-                )
+                ).set_attr("open", "")
             ),
         ).style({"max-width": "640px"})
 

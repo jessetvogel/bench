@@ -31,20 +31,26 @@ class Process:
         self._stderr = ""
 
     def poll(self) -> int | None:
-        # Update `stdout` and `stderr`
-        ready, _, _ = select.select([self._master_fd], [], [], 0.0)
-        if self._master_fd in ready:
-            try:
-                while True:
-                    chunk = os.read(self._master_fd, 1024)
-                    if not chunk:
-                        break
-                    self._stdout += chunk.decode()
-            except (OSError, BlockingIOError):
-                pass  # TODO: ?
+        # Get status of the process
+        status = self._process.poll()
 
-        # Actually poll
-        return self._process.poll()
+        # If process is still running, only read if `select` says there is data
+        if status is None:
+            ready, _, _ = select.select([self._master_fd], [], [], 0.0)
+            if self._master_fd not in ready:
+                return status
+
+        # Read data
+        try:
+            while True:
+                chunk = os.read(self._master_fd, 4096)
+                if not chunk:
+                    break
+                self._stdout += chunk.decode()
+        except (OSError, BlockingIOError):
+            pass
+
+        return status
 
     @property
     def stdout(self) -> str:
