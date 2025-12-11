@@ -401,6 +401,7 @@ class TimeElem(Panel):
                 "margin": "16px 0px",
                 "align-items": "center",
                 "justify-content": "space-around",
+                "justify-items": "center",
             }
         )
         self.append(data)
