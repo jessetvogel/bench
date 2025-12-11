@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -26,6 +27,7 @@ def main_dashboard() -> None:
         Dashboard(engine).run()
     except Exception as err:
         logger.error(f"({type(err).__name__}) {err}")
+        sys.exit(1)
 
 
 def main_run() -> None:
@@ -51,3 +53,4 @@ def main_run() -> None:
         logger.info("Done!")
     except Exception as err:
         logger.error(f"({type(err).__name__}) {err}")
+        sys.exit(1)

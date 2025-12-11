@@ -61,3 +61,49 @@ def icon_oplus() -> Elem:
         '<path d="M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#323232" stroke-width="2"/>'  # noqa: E501
         "</svg>"
     )
+
+
+def icon_done() -> Elem:
+    return parse_svg(
+        '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="var(--green)" fill-rule="evenodd" d="M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18m-.232-5.36l5-6l-1.536-1.28l-4.3 5.159l-2.225-2.226l-1.414 1.414l3 3l.774.774z" clip-rule="evenodd"/></svg>'  # noqa: E501
+    )
+
+
+def icon_loading() -> Elem:
+    return SVG(
+        SVGElem(
+            "path",
+            SVGElem(
+                "animateTransform",
+                **{
+                    "attributeName": "transform",
+                    "type": "rotate",
+                    "from": "0 12 12",
+                    "to": "360 12 12",
+                    "dur": "1s",
+                    "repeatCount": "indefinite",
+                },
+            ),
+            fill="var(--blue)",
+            d="M12 2.25c-5.384 0-9.75 4.366-9.75 9.75s4.366 9.75 9.75 9.75v-2.437A7.312 7.312 0 1 1 19.313 12h2.437c0-5.384-4.366-9.75-9.75-9.75",  # noqa: E501
+        ),
+        width="24",
+        height="24",
+        viewBox="0 0 24 24",
+    )
+
+    # return parse_svg(
+    #     '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
+    #     '<path fill="currentColor" d="M12 2.25c-5.384 0-9.75 4.366-9.75 9.75s4.366 9.75 9.75 9.75v-2.437A7.312 7.312 0 1 1 19.313 12h2.437c0-5.384-4.366-9.75-9.75-9.75">'  # noqa: E501
+    #     '<animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite" />'  # noqa: E501
+    #     "</path>"
+    #     "</svg>"
+    # )
+
+
+def icon_error() -> Elem:
+    return parse_svg(
+        '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">'
+        '<path fill="var(--red)" d="M12 17q.425 0 .713-.288T13 16t-.288-.712T12 15t-.712.288T11 16t.288.713T12 17m0-4q.425 0 .713-.288T13 12V8q0-.425-.288-.712T12 7t-.712.288T11 8v4q0 .425.288.713T12 13m0 9q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"/>'  # noqa: E501
+        "</svg>"
+    )

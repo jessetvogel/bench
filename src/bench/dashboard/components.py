@@ -9,26 +9,33 @@ from slash.basic import Axes, Checkbox
 from slash.basic import Graph as SlashGraph
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
-from slash.html import H2, H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, P, Pre, Select, Span, Summary
+from slash.html import H2, H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, Pre, Select, Span, Summary
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench.dashboard.ansi import ansi2html
-from bench.dashboard.icons import icon_oplus
+from bench.dashboard.icons import icon_done, icon_error, icon_loading, icon_oplus
 from bench.dashboard.utils import Timer, prompt, timedelta_to_str
-from bench.engine import Engine
+from bench.engine import Engine, Execution
 from bench.metrics import Graph, Metric, Table, Time
-from bench.process import Process
-from bench.templates import Method, Param, Run, Task
+from bench.templates import Param, Run, Task
 
 
 class Menu(Column):
     """Menu component."""
 
-    def __init__(self, engine: Engine, content: Signal[Elem]) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        *,
+        content: Signal[Elem],
+    ) -> None:
         super().__init__()
         self._engine = engine
         self._content = content
+
+        self._executions = Signal(self._engine.executions)
+
         self._setup()
 
     def _setup(self) -> None:
@@ -42,91 +49,150 @@ class Menu(Column):
             }
         )
 
-        self._dots: dict[str, Div] = {}
-
         # Tasks
-        self._add_header("Tasks")
+        self.append(self._header("Tasks"))
         for task in self._engine.cache.select_tasks():
 
             def handle_click(event: ClickEvent, task: Task) -> None:
                 self._click_task(task)
 
-            self._add_item(task.label(), onclick=partial(handle_click, task=task))
+            self.append(self._item(task.label(), onclick=partial(handle_click, task=task)))
 
-        self._add_item(icon_oplus(), "create new task", onclick=lambda: self._content.set(PageNewTask(self._engine)))
-
-        # --------
-        self._add_separator()
-
-        # Info
-        self._add_header("Info")
-        self._add_item("About")
-        self._add_item("Processes", onclick=self._click_processes)
-
-        # Theme
-        self._add_theme_buttons()
-
-    def _add_header(self, *children: Children) -> None:
         self.append(
-            Div(*children).style(
-                {
-                    "display": "flex",
-                    "align-items": "center",
-                    "gap": "8px",
-                    "height": "40px",
-                    "line-height": "40px",
-                    "padding": "0px 8px",
-                    # "color": "var(--text-muted)",
-                    "font-weight": "bold",
-                }
+            self._item(
+                icon_oplus(),
+                "create new task",
+                onclick=lambda: self._content.set(PageNewTask(self._engine)),
             )
         )
 
-    def _add_item(self, *children: Children, onclick: Callable[[], Awaitable[Any] | Any] | None = None) -> None:
-        self.append(
-            item := Div(*children).style(
-                {
-                    "display": "flex",
-                    "align-items": "center",
-                    "gap": "8px",
-                    "height": "40px",
-                    "line-height": "40px",
-                    "padding": "0px 8px",
-                    "cursor": "pointer",
-                }
-            )
+        # --------
+        self.append(self._separator())
+
+        # Info
+        self.append(self._header("Info"))
+        self.append(self._item("About"))
+
+        # Processes
+        self.append(self._header("Processes"))
+        self.append(self._processes())
+
+        # Theme
+        self.append(self._theme_buttons())
+
+        # Timer
+        self.append(Timer(self._refresh, seconds=1.0, repeat=True))
+
+    def _header(self, *children: Children) -> Elem:
+        return Div(*children).style(
+            {
+                "display": "flex",
+                "align-items": "center",
+                "gap": "8px",
+                "height": "40px",
+                "line-height": "40px",
+                "padding": "0px 8px",
+                # "color": "var(--text-muted)",
+                "font-weight": "bold",
+            }
+        )
+
+    def _item(self, *children: Children, onclick: Callable[[], Awaitable[Any] | Any] | None = None) -> Elem:
+        item = Div(*children).style(
+            {
+                "display": "flex",
+                "align-items": "center",
+                "gap": "8px",
+                "height": "40px",
+                "padding": "0px 8px",
+                "cursor": "pointer",
+            }
         )
         if onclick is not None:
             item.onclick(onclick)
+        return item
 
-    def _add_separator(self) -> None:
-        self.append(
-            Div().style(
-                {
-                    "height": "0px",
-                    "border-bottom": "1px solid var(--border)",
-                    "margin": "8px",
-                }
-            )
+    def _separator(self) -> Elem:
+        return Div().style(
+            {
+                "height": "0px",
+                "border-bottom": "1px solid var(--border)",
+                "margin": "8px",
+            }
         )
 
-    def _add_theme_buttons(self) -> None:
-        self.append(
-            Row(
-                Row("light")
-                .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
-                .onclick(lambda: Session.require().set_theme("light")),
-                Row("dark")
-                .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
-                .onclick(lambda: Session.require().set_theme("dark")),
-            ).style({"margin": "auto 0px 8px 0px", "justify-content": "center", "gap": "32px"})
-        )
+    def _theme_buttons(self) -> Elem:
+        return Row(
+            Row("light")
+            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
+            .onclick(lambda: Session.require().set_theme("light")),
+            Row("dark")
+            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
+            .onclick(lambda: Session.require().set_theme("dark")),
+        ).style({"margin": "auto 0px 8px 0px", "justify-content": "center", "gap": "32px"})
 
     def _click_task(self, task: Task) -> None:
         self._content.set(PageTask(self._engine, task))
 
-    def _click_processes(self) -> None:
-        self._content.set(PageProcesses(self._engine))
+    def _click_process(self, execution: Execution) -> None:
+        self._content.set(PageProcess(self._engine, execution))
+
+    def _processes(self) -> Elem:
+        column = Column()
+
+        def set_column() -> None:
+            column.clear()
+            statuses: dict[str, Signal[int | None]] = {}
+            for execution in self._executions():
+                # Reactive icon
+                icon_status = Div()
+                status = Signal(execution.process.poll())
+                Effect(lambda: icon_status.clear().append(self.icon_status(status())))
+                statuses[execution.run.id] = status
+
+                def handle_click(event: ClickEvent, execution: Execution) -> None:
+                    self._click_process(execution)
+
+                column.append(
+                    Div(
+                        icon_status,
+                        Column(
+                            Span(execution.task.label()),
+                            Span(execution.method.label()),
+                        ).style({"font-size": "12px"}),
+                    )
+                    .style(
+                        {
+                            "display": "flex",
+                            "align-items": "center",
+                            "gap": "8px",
+                            "height": "40px",
+                            "padding": "0px 8px",
+                            "cursor": "pointer",
+                        }
+                    )
+                    .onclick(partial(handle_click, execution=execution))
+                )
+
+            def refresh_statuses() -> None:
+                for execution in self._executions():
+                    statuses[execution.run.id].set(execution.process.poll())
+
+            column.append(Timer(refresh_statuses, seconds=1.0, repeat=True))
+
+        Effect(set_column)
+        return column
+
+    def icon_status(self, status: int | None) -> Elem:
+        if status is None:
+            return icon_loading()
+        elif status == 0:
+            return icon_done()
+        else:
+            return icon_error()
+
+    def _refresh(self) -> None:
+        self._executions.set(self._engine.executions)
 
 
 class PageNewTask(Div):
@@ -153,34 +219,19 @@ class PageNewTask(Div):
         )
 
 
-class PageProcesses(Div):
-    def __init__(self, engine: Engine) -> None:
+class PageProcess(Div):
+    def __init__(self, engine: Engine, execution: Execution) -> None:
         super().__init__()
         self._engine = engine
+        self._execution = execution
         self._setup()
 
     def _setup(self) -> None:
-        self.append(H3("Processes"))
-        self.append(P("This page shows the most recent processes."))
+        task = self._execution.task
+        method = self._execution.method
+        process = self._execution.process
+        created_at = self._execution.created_at
 
-        self.append(
-            Column(
-                [self._process_panel(task, method, process) for task, method, process in self._engine.processes]
-            ).style({"gap": "16px"})
-        )
-
-        if not self._engine.processes:
-            self.append(Span("There are currently no processes running.").style({"font-style": "italic"}))
-
-    def _process_status(self, status: int | None) -> Span:
-        if status is None:
-            return Span("Running..").style({"font-style": "italic"})
-        if status == 0:
-            return Span("Done").style({"font-weight": "bold", "color": "var(--green)"})
-        else:
-            return Span("Failed").style({"font-weight": "bold", "color": "var(--red)"})
-
-    def _process_panel(self, task: Task, method: Method, process: Process) -> Panel:
         status = Signal(process.poll())
         stdout = Signal(process.stdout)
 
@@ -199,12 +250,16 @@ class PageProcesses(Div):
 
         timer = Timer(timer_callback, 1.0, repeat=True)
 
-        return Panel(
+        self.clear()
+        self.append(
+            H3("Process information"),
             Div(
                 Span("Task").style({"font-weight": "bold"}),
                 Span(task.label()),
                 Span("Method").style({"font-weight": "bold"}),
                 Span(method.label()),
+                Span("Created at").style({"font-weight": "bold"}),
+                Span(created_at.strftime("%B %d, %Y, %H:%M:%S")),
                 Span("Status").style({"font-weight": "bold"}),
                 status_span,
             ).style(
@@ -224,6 +279,14 @@ class PageProcesses(Div):
                 )
             ),
         ).style({"max-width": "640px"})
+
+    def _process_status(self, status: int | None) -> Span:
+        if status is None:
+            return Span("Running..").style({"font-style": "italic"})
+        if status == 0:
+            return Span("Done").style({"font-weight": "bold", "color": "var(--green)"})
+        else:
+            return Span("Failed").style({"font-weight": "bold", "color": "var(--red)"})
 
 
 class PageTask(Div):

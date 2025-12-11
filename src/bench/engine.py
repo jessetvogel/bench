@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 import importlib.util
 import secrets
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -21,7 +25,7 @@ class Engine:
         self._path = path
         self._logger = get_logger("bench")
         self._bench = load_bench(path)
-        self._processes: list[tuple[Task, Method, Process]] = []
+        self._executions: list[Execution] = []
 
     @property
     def bench(self) -> Bench:
@@ -36,9 +40,9 @@ class Engine:
         return self._cache
 
     @property
-    def processes(self) -> Iterable[tuple[Task, Method, Process]]:
+    def executions(self) -> Iterable[Execution]:
         """Currently running processes."""
-        return tuple(self._processes)
+        return tuple(self._executions)
 
     def create_task(self, task_type: type[Task], **kwargs: int | float | str) -> None:
         """Create task of given type with given arguments.
@@ -60,17 +64,27 @@ class Engine:
         self.cache.insert_method(method)
 
         # Create new run with status pending
+        task_id = hash_serializable(task)
+        method_id = hash_serializable(method)
         run = Run(
             id=secrets.token_hex(8),
-            task_id=hash_serializable(task),
-            method_id=hash_serializable(method),
+            task_id=task_id,
+            method_id=method_id,
             result=None,
         )
         self.cache.insert_or_update_run(run)
 
         # Execute the run as a separate process
         process = Process(["bench-run", str(self._path), run.id])
-        self._processes.append((task, method, process))
+        self._executions.append(
+            Execution(
+                task=task,
+                method=method,
+                run=run,
+                created_at=datetime.now(),
+                process=process,
+            )
+        )
 
     def execute_run(self, run_id: str) -> None:
         """Execute run with given id.
@@ -132,3 +146,12 @@ def load_bench(path: Path) -> Bench:
 
     msg = f"Python module '{path}' contains no instance of `Bench`"
     raise ValueError(msg)
+
+
+@dataclass
+class Execution:
+    task: Task
+    method: Method
+    run: Run
+    created_at: datetime
+    process: Process
