@@ -5,7 +5,7 @@ from datetime import timedelta
 from functools import partial
 from typing import Any, Awaitable, Callable, cast
 
-from slash.basic import Axes, Checkbox
+from slash.basic import Axes, Checkbox, Icon
 from slash.basic import Graph as SlashGraph
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
@@ -14,7 +14,6 @@ from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench.dashboard.ansi import ansi2html
-from bench.dashboard.icons import icon_done, icon_error, icon_loading, icon_oplus
 from bench.dashboard.utils import Timer, prompt, timedelta_to_str
 from bench.engine import Engine, Execution
 from bench.metrics import Graph, Metric, Table, Time
@@ -60,7 +59,6 @@ class Menu(Column):
 
         self.append(
             self._item(
-                icon_oplus(),
                 "create new task",
                 onclick=lambda: self._content.set(PageNewTask(self._engine)),
             )
@@ -70,11 +68,10 @@ class Menu(Column):
         self.append(self._separator())
 
         # Info
-        self.append(self._header("Info"))
-        self.append(self._item("About"))
+        # self.append(self._header("Info"))
+        # self.append(self._item("About"))
 
         # Processes
-        self.append(self._header("Processes"))
         self.append(self._processes())
 
         # Theme
@@ -123,11 +120,11 @@ class Menu(Column):
 
     def _theme_buttons(self) -> Elem:
         return Row(
-            Row("light")
-            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
+            Row(Icon("sun"), "light")
+            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "6px"})
             .onclick(lambda: Session.require().set_theme("light")),
-            Row("dark")
-            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "8px"})
+            Row(Icon("moon"), "dark")
+            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "6px"})
             .onclick(lambda: Session.require().set_theme("dark")),
         ).style({"margin": "auto 0px 8px 0px", "justify-content": "center", "gap": "32px"})
 
@@ -142,12 +139,17 @@ class Menu(Column):
 
         def set_column() -> None:
             column.clear()
+
+            executions = self._executions()
+            if executions:
+                column.append(self._header("Processes"))
+
             statuses: dict[str, Signal[int | None]] = {}
-            for execution in self._executions():
+            for execution in executions:
                 # Reactive icon
-                icon_status = Div()
+                icon = Icon("")
                 status = Signal(execution.process.poll())
-                Effect(lambda: icon_status.clear().append(self.icon_status(status())))
+                Effect(lambda: icon.set_icon(self.icon_status(status())))
                 statuses[execution.run.id] = status
 
                 def handle_click(event: ClickEvent, execution: Execution) -> None:
@@ -155,7 +157,7 @@ class Menu(Column):
 
                 column.append(
                     Div(
-                        icon_status,
+                        icon,
                         Column(
                             Span(execution.task.label()),
                             Span(execution.method.label()),
@@ -183,13 +185,13 @@ class Menu(Column):
         Effect(set_column)
         return column
 
-    def icon_status(self, status: int | None) -> Elem:
+    def icon_status(self, status: int | None) -> str:
         if status is None:
-            return icon_loading()
+            return "loading"
         elif status == 0:
-            return icon_done()
+            return "success"
         else:
-            return icon_error()
+            return "error"
 
     def _refresh(self) -> None:
         self._executions.set(self._engine.executions)
@@ -202,7 +204,7 @@ class PageNewTask(Div):
         self._setup()
 
     def _setup(self) -> None:
-        for task_type in self._engine.bench.task_types():
+        for task_type in self._engine.bench.task_types:
             self.append(Button(task_type.type_name()).onclick(lambda: self._create_task(task_type)))
 
     def _create_task(self, task_type: type[Task]) -> None:
@@ -278,9 +280,9 @@ class PageProcess(Div):
                     timer,
                 ).set_attr("open", "")
             ),
-        ).style({"max-width": "640px"})
+        )
 
-    def _process_status(self, status: int | None) -> Span:
+    def _process_status(self, status: int | None) -> Elem:
         if status is None:
             return Span("Running..").style({"font-style": "italic"})
         if status == 0:
@@ -314,10 +316,20 @@ class PageTask(Div):
             selected_groups.set([group for group, checkbox in zip(groups, checkboxes) if checkbox.checked])
 
         for group in groups:
-            method = self._engine.cache.select_method(group.method_id)
+            try:
+                method = self._engine.cache.select_method(group.method_id)
+                method_label = method.label()
+            except Exception as err:
+                Session.require().log(
+                    f"Failed to get method with ID {group.method_id}",
+                    details=Pre(Code(str(err))),
+                    level="error",
+                )
+                method_label = "?"
+
             checkbox = Checkbox(
                 Span(
-                    Span(method.type_name()).style(
+                    Span(method_label).style(
                         {
                             "background-color": group.color,
                             "color": "var(--white)",
@@ -526,7 +538,7 @@ class DialogNewExperiment(Dialog):
         self._setup()
 
     def _setup(self) -> None:
-        method_types = {method_type.type_name(): method_type for method_type in self._engine.bench.method_types()}
+        method_types = {method_type.type_name(): method_type for method_type in self._engine.bench.method_types}
 
         form_wrapper = Div().style({"margin-top": "16px"})
 
@@ -557,7 +569,7 @@ class DialogNewExperiment(Dialog):
             Row(
                 start := Button("Start").onclick(handle_click_start),
                 Button("Cancel").onclick(lambda: self.unmount()),
-            ).style({"justify-content": "center", "gap": "16px"})
+            ).style({"justify-content": "center", "gap": "16px", "margin-top": "16px"})
         )
         start.disabled = True
 

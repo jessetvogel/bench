@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
-from typing import Any, Generic, Iterator, Literal, Mapping, Protocol, Self, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, Generic, Iterator, Literal, Protocol, Self, TypeVar
 
 from bench.metrics import Metric
 from bench.serialization import PlainData, Serializable
@@ -74,14 +74,20 @@ def _params_default(cls) -> list[Param]:
             continue
         if param.kind is param.VAR_POSITIONAL or param.kind is param.VAR_KEYWORD:
             continue
-        type = {
+
+        annotation = param.annotation
+        if isinstance(annotation, type):
+            annotation = annotation.__name__
+
+        type_ = {
             "bool": bool,
             "int": int,
             "float": float,
             "str": str,
-        }.get(param.annotation, str)
+        }.get(annotation, str)
+
         default = param.default if param.default != param.empty else None
-        params.append(Param(name=name, type=type, default=default))
+        params.append(Param(name=name, type=type_, default=default))
     return params
 
 
@@ -165,7 +171,7 @@ class Token(Serializable):
 class Result(Serializable):
     """Result class."""
 
-    def __init__(self, data: Mapping[str, PlainData]) -> None:
+    def __init__(self, **data: PlainData) -> None:
         self._data = dict(data)
 
     def __getitem__(self, index: str) -> PlainData:
@@ -174,13 +180,17 @@ class Result(Serializable):
     def __setitem__(self, index: str, value: PlainData) -> None:
         self._data[index] = value
 
+    @classmethod
+    def type_name(cls) -> str:
+        return cls.__name__
+
     def encode(self) -> PlainData:
         return dict(self._data)
 
     @classmethod
     def decode(cls, data: PlainData) -> Self:
         assert isinstance(data, dict)
-        return cls(data)
+        return cls(**data)
 
 
 class Metrics:
@@ -269,46 +279,104 @@ class Run:
 
 
 class Bench(ABC):
-    """Specification of the benchmark."""
+    """Specification of the benchmark.
+
+    Args:
+        name: Name of the benchmark.
+    """
+
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self._task_types: list[type[Task]] = []
+        self._method_types: list[type[Method]] = []
+        self._result_types: list[type[Result]] = []
+        self._handler_run: Callable[[Task, Method], Result | Token] | None = None
+        self._handler_poll: Callable[[Token], Result | None] | None = None
+
+    def set_name(self, name: str) -> None:
+        self._name = name
+
+    def add_task_types(self, *types: type[Task]) -> None:
+        # TODO: Validate the tasks (are all methods implemented?)
+        self._task_types.extend(types)
+
+    def add_method_types(self, *types: type[Method]) -> None:
+        # TODO: Validate the methods (are all methods implemented?)
+        self._method_types.extend(types)
+
+    def add_result_types(self, *types: type[Result]) -> None:
+        # TODO: Validate the results (are all methods implemented?)
+        self._result_types.extend(types)
+
+    def on_run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
+        """Set handler for executing tasks with a method.
+
+        Args:
+            handler: Function that executes a task with a method. The function should return
+                a :py:class:`Result` instance if the task can be completed at once.
+                Otherwise, a :py:class:`Token` instance is returned which can be used
+                to obtain the result at a later time.
+        """
+        # TODO: validate handler
+        self._handler_run = handler
+
+    def run(self, task: Task, method: Method) -> Result | Token:
+        if self._handler_run is None:
+            msg = "No run handler was registered. Use the `on_run` method to register a handler."
+            raise RuntimeError(msg)
+        return self._handler_run(task, method)
+
+    def on_poll(self, handler: Callable[[Token], Result | None]) -> None:
+        """Set handler for polling a result.
+
+        Args:
+            handler: Function that checks if the execution of the task is completed.
+                This function should return a :py:class:`Result` instance if the task
+                is completed, and :py:const:`None` otherwise.
+        """
+        # TODO: validate handler
+        self._handler_poll = handler
+
+    def poll(self, token: Token) -> Result | None:
+        if self._handler_poll is None:
+            msg = "No poll handler was registered. Use the `on_poll` method to register a handler."
+            raise RuntimeError(msg)
+        return self._handler_poll(token)
 
     @property
-    @abstractmethod
     def name(self) -> str:
         """Name of the benchmark."""
+        return self._name
 
-    @abstractmethod
+    @property
     def task_types(self) -> Iterable[type[Task]]:
-        """Iterable of supported task types."""
-        raise NotImplementedError()
+        return iter(self._task_types)
 
-    @abstractmethod
+    @property
     def method_types(self) -> Iterable[type[Method]]:
-        """Iterable of supported method types."""
-        raise NotImplementedError()
+        return iter(self._method_types)
 
-    @abstractmethod
-    def run(self, task: Task, method: Method) -> Result | Token:
-        """Run the given task with the given method.
+    @property
+    def result_types(self) -> Iterable[type[Result]]:
+        return iter(self._result_types)
 
-        Args:
-            task: Task to perform.
-            method: Method to apply.
+    def get_task_type(self, name: str) -> type[Task]:
+        for task_type in self._task_types:
+            if task_type.type_name() == name:
+                return task_type
+        msg = f"Unknown task type '{name}'"
+        raise ValueError(msg)
 
-        Returns:
-            A :py:class:`Result` instance if the task can be completed at once.
-            Otherwise, a :py:class:`Token` instance is returned which can be used
-            to obtain the result at a later time.
-        """
-        raise NotImplementedError()
+    def get_method_type(self, name: str) -> type[Method]:
+        for method_type in self._method_types:
+            if method_type.type_name() == name:
+                return method_type
+        msg = f"Unknown method type '{name}'"
+        raise ValueError(msg)
 
-    @abstractmethod
-    def poll(self, token: Token) -> Result | None:
-        """Poll the result of a task using a token.
-
-        Args:
-            token: Token returned by the :py:meth:`run` method.
-
-        Returns:
-            A :py:class:`Result` instance if the task is completed, otherwise :py:const:`None`.
-        """
-        raise NotImplementedError()
+    def get_result_type(self, name: str) -> type[Result]:
+        for result_type in self._result_types:
+            if result_type.type_name() == name:
+                return result_type
+        msg = f"Unknown result type '{name}'"
+        raise ValueError(msg)
