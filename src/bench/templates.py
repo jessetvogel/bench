@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
-from typing import Any, Generic, Iterator, Literal, Protocol, Self, TypeVar
+from typing import Any, Generic, Iterator, Literal, Protocol, Self, TypeVar, cast
 
 from bench.metrics import Metric
 from bench.serialization import PlainData, Serializable
@@ -118,11 +118,11 @@ class Task(ABC, Serializable):
         """Evaluate the result into metrics."""
 
     @abstractmethod
-    def encode(self) -> PlainData: ...
+    def encode(self) -> dict[str, PlainData]: ...
 
     @classmethod
     @abstractmethod
-    def decode(cls, data: PlainData) -> Self: ...
+    def decode(cls, data: dict[str, PlainData]) -> Self: ...
 
 
 class Method(Serializable, Protocol):
@@ -143,11 +143,11 @@ class Method(Serializable, Protocol):
         return self.type_name()
 
     @abstractmethod
-    def encode(self) -> PlainData: ...
+    def encode(self) -> dict[str, PlainData]: ...
 
     @classmethod
     @abstractmethod
-    def decode(cls, data: PlainData) -> Self: ...
+    def decode(cls, data: dict[str, PlainData]) -> Self: ...
 
 
 class Token(Serializable):
@@ -160,12 +160,12 @@ class Token(Serializable):
     def data(self) -> PlainData:
         return self._data
 
-    def encode(self) -> PlainData:
-        return self.data
+    def encode(self) -> dict[str, PlainData]:
+        return {"data": self.data}
 
     @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        return cls(data)
+    def decode(cls, data: dict[str, PlainData]) -> Self:
+        return cls(data["data"])
 
 
 class Result(Serializable):
@@ -184,11 +184,11 @@ class Result(Serializable):
     def type_name(cls) -> str:
         return cls.__name__
 
-    def encode(self) -> PlainData:
+    def encode(self) -> dict[str, PlainData]:
         return dict(self._data)
 
     @classmethod
-    def decode(cls, data: PlainData) -> Self:
+    def decode(cls, data: dict[str, PlainData]) -> Self:
         assert isinstance(data, dict)
         return cls(**data)
 
@@ -227,13 +227,12 @@ class BenchError(Exception, Serializable):
     def message(self) -> str:
         return self._message
 
-    def encode(self) -> PlainData:
-        return self.message
+    def encode(self) -> dict[str, PlainData]:
+        return {"msg": self.message}
 
     @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        assert isinstance(data, str)
-        return cls(data)
+    def decode(cls, data: dict[str, PlainData]) -> Self:
+        return cls(cast(str, data["msg"]))
 
 
 class Run:
