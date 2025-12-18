@@ -352,7 +352,7 @@ class PageTask(Div):
         self.append(
             Div(
                 [create_metric_elem(self._engine, name, metric, selected_groups) for name, metric in metrics.items()]
-            ).style({"display": "flex", "gap": "16px", "justify-content": "center", "flex-wrap": "wrap"})
+            ).style({"display": "flex", "gap": "16px", "flex-wrap": "wrap"})
         )
 
     def _create_experiment(self) -> None:

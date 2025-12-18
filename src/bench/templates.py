@@ -118,11 +118,11 @@ class Task(ABC, Serializable):
         """Evaluate the result into metrics."""
 
     @abstractmethod
-    def encode(self) -> dict[str, PlainData]: ...
+    def encode(self) -> PlainData: ...
 
     @classmethod
     @abstractmethod
-    def decode(cls, data: dict[str, PlainData]) -> Self: ...
+    def decode(cls, data: PlainData) -> Self: ...
 
 
 class Method(Serializable, Protocol):
@@ -143,11 +143,11 @@ class Method(Serializable, Protocol):
         return self.type_name()
 
     @abstractmethod
-    def encode(self) -> dict[str, PlainData]: ...
+    def encode(self) -> PlainData: ...
 
     @classmethod
     @abstractmethod
-    def decode(cls, data: dict[str, PlainData]) -> Self: ...
+    def decode(cls, data: PlainData) -> Self: ...
 
 
 class Token(Serializable):
@@ -160,12 +160,12 @@ class Token(Serializable):
     def data(self) -> PlainData:
         return self._data
 
-    def encode(self) -> dict[str, PlainData]:
-        return {"data": self.data}
+    def encode(self) -> PlainData:
+        return self.data
 
     @classmethod
-    def decode(cls, data: dict[str, PlainData]) -> Self:
-        return cls(data["data"])
+    def decode(cls, data: PlainData) -> Self:
+        return cls(data)
 
 
 class Result(Serializable):
@@ -184,11 +184,11 @@ class Result(Serializable):
     def type_name(cls) -> str:
         return cls.__name__
 
-    def encode(self) -> dict[str, PlainData]:
+    def encode(self) -> PlainData:
         return dict(self._data)
 
     @classmethod
-    def decode(cls, data: dict[str, PlainData]) -> Self:
+    def decode(cls, data: PlainData) -> Self:
         assert isinstance(data, dict)
         return cls(**data)
 
@@ -227,12 +227,12 @@ class BenchError(Exception, Serializable):
     def message(self) -> str:
         return self._message
 
-    def encode(self) -> dict[str, PlainData]:
-        return {"msg": self.message}
+    def encode(self) -> PlainData:
+        return self.message
 
     @classmethod
-    def decode(cls, data: dict[str, PlainData]) -> Self:
-        return cls(cast(str, data["msg"]))
+    def decode(cls, data: PlainData) -> Self:
+        return cls(cast(str, data))
 
 
 class Run:
