@@ -26,9 +26,10 @@ class Dashboard:
         content_elem = Div().style(
             {
                 "flex-grow": "1",
-                "padding": "0px 8px 0px 16px",
+                "padding": "8px 8px 8px 8px",
                 "max-height": "100dvh",
                 "overflow-y": "auto",
+                "box-sizing": "border-box",
             }
         )
 

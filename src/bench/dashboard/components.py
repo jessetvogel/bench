@@ -35,9 +35,7 @@ class Menu(Column):
         super().__init__()
         self._engine = engine
         self._content = content
-
         self._executions = Signal(self._engine.executions)
-
         self._setup()
 
     def _setup(self) -> None:
@@ -47,7 +45,7 @@ class Menu(Column):
                 "height": "calc(100dvh - 16px)",
                 "margin": "8px",
                 "padding": "8px",
-                "border-radius": "16px",
+                "border-radius": "8px",
                 "box-sizing": "border-box",
                 "background-color": "var(--bg)",
                 "box-shadow": "var(--shadow)",
