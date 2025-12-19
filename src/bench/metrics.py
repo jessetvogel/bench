@@ -25,8 +25,9 @@ class Time(Metric):
 
 @dataclass
 class Graph(Metric):
-    keys_xs: str
-    keys_ys: str
+    key_xs: str
+    key_ys: str
     title: str | None = None
     xlabel: str | None = None
     ylabel: str | None = None
+    option_mean_std: bool = False

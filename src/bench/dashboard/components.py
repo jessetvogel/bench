@@ -5,8 +5,11 @@ from datetime import timedelta
 from functools import partial
 from typing import Any, Awaitable, Callable, cast
 
+import numpy as np
 from slash.basic import Axes, Checkbox, Icon
+from slash.basic import FillBetween as SlashFillBetween
 from slash.basic import Graph as SlashGraph
+from slash.basic import Plot as SlashPlot
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
 from slash.html import H2, H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, Pre, Select, Span, Summary
@@ -41,10 +44,14 @@ class Menu(Column):
         self.style(
             {
                 "width": "224px",
-                "height": "100dvh",
+                "height": "calc(100dvh - 16px)",
+                "margin": "8px",
+                "padding": "8px",
+                "border-radius": "16px",
+                "box-sizing": "border-box",
                 "background-color": "var(--bg)",
                 "box-shadow": "var(--shadow)",
-                "border-right": "1px solid var(--border-muted)",
+                "border": "1px solid var(--border-muted)",
             }
         )
 
@@ -461,41 +468,89 @@ class GraphElem(Panel):
         self._name = name
         self._graph = graph
         self._selected_groups = selected_groups
-        Effect(self._setup)
+        self._setup()
+        Effect(self._plot)
 
     def _setup(self) -> None:
-        groups = self._selected_groups()
-
         self.clear()
-        self.style(
-            {
-                "padding": "16px",
-                "display": "none" if len(groups) == 0 else None,
-            }
-        )
+        self.style({"display": "flex", "flex-direction": "column", "align-items": "center"})
 
-        axes = Axes(width=512, height=384).set_grid(True)
-        axes.onmount(lambda: axes.render())
+        self._axes = Axes(width=512, height=384).set_grid(True)
+        self._axes.onmount(lambda: self._axes.render())
 
         if self._graph.title is not None:
-            axes.set_title(self._graph.title)
+            self._axes.set_title(self._graph.title)
         if self._graph.xlabel is not None:
-            axes.set_xlabel(self._graph.xlabel)
+            self._axes.set_xlabel(self._graph.xlabel)
         if self._graph.ylabel is not None:
-            axes.set_ylabel(self._graph.ylabel)
+            self._axes.set_ylabel(self._graph.ylabel)
 
+        self.append(self._axes)
+
+        # "Show average" and "Show standard deviation"
+        if self._graph.option_mean_std:
+            # Create checkbox
+            def on_click_checkbox_avg() -> None:
+                self._checkbox_std.set_disabled(not self._checkbox_avg.checked)
+                self._plot()
+
+            self._checkbox_avg = Checkbox("Show average").onclick(on_click_checkbox_avg)
+            self._checkbox_std = Checkbox("Show standard deviation").onclick(self._plot).set_disabled(True)
+            self.append(Row(self._checkbox_avg, self._checkbox_std).style({"gap": "32px"}))
+
+    def _plot(self) -> None:
+        groups = self._selected_groups()
+        # Hide panels if no groups are selected
+        self.style({"padding": "16px", "display": "none" if len(groups) == 0 else "flex"})
+        # Clear previous plots
+        self._axes.clear_plots()
+        # Plot each run in each group
         for group in groups:
-            for run in group.runs:
-                if run.status != "done":
-                    continue
+            runs = [run for run in group.runs if run.status == "done"]
+            # Case "[ ] Show average" is checked
+            if self._graph.option_mean_std and self._checkbox_avg.checked:
+                for plot in self._create_avg_std_graphs(runs, group.color):
+                    self._axes.add_plot(plot)
+            # Case "[ ] Show average" is not checked
+            else:
+                for run in runs:
+                    self._axes.add_plot(self._create_graph(run, group.color))
+        # Render if possible
+        if self._axes.is_mounted():
+            self._axes.render()
 
-                metrics = self._engine.evaluate_run(run)
-                xs = metrics[self._graph.keys_xs]
-                ys = metrics[self._graph.keys_ys]
+    def _create_graph(self, run: Run, color: str) -> SlashPlot:
+        # Evaluate run
+        metrics = self._engine.evaluate_run(run)
+        # Get `xs` and `ys` and create graph
+        xs = metrics[self._graph.key_xs]
+        ys = metrics[self._graph.key_ys]
+        return SlashGraph(xs, ys, color=color)
 
-                axes.add_plot(SlashGraph(xs, ys, color=group.color))
-
-        self.append(axes)
+    def _create_avg_std_graphs(self, runs: list[Run], color: str) -> list[SlashPlot]:
+        # If there are no runs, return an empty list of plots
+        if len(runs) == 0:
+            return []
+        # Evaluate runs
+        metrics_per_run = [self._engine.evaluate_run(run) for run in runs]
+        # Collect the `xs` (should be the same for all runs) and the `ys`
+        xs = metrics_per_run[0][self._graph.key_xs]
+        yss: list[list[float]] = []
+        for metrics in metrics_per_run:
+            assert metrics[self._graph.key_xs] == xs, "all xs must be the same for avg"
+            yss.append(metrics[self._graph.key_ys])
+        # Create plot of the average of the `ys`
+        plots: list[SlashPlot] = []
+        np_yss = np.array(yss)
+        ys_avg = [float(y_avg) for y_avg in np_yss.mean(axis=0)]
+        plots.append(SlashGraph(xs, ys_avg, color=color))
+        # Create a plot of the standard deviation of the `ys`
+        if self._checkbox_std.checked:
+            ys_std = [float(y_std) for y_std in np_yss.std(axis=0)]
+            ys_low = [float(y - std) for y, std in zip(ys_avg, ys_std)]
+            ys_high = [float(y + std) for y, std in zip(ys_avg, ys_std)]
+            plots.append(SlashFillBetween(xs, ys_low, ys_high, color=color, opacity=0.2))
+        return plots
 
 
 @dataclass
@@ -552,8 +607,9 @@ class DialogNewExperiment(Dialog):
             method_type = method_types[select.value]
             form = cast(Form, form_wrapper.children[0])
             method = method_type(**{param.name: form.value(param) for param in method_type.params()})
+            num_runs = int(input_num_runs.value)
             self.unmount()
-            self._engine.launch_run(self._task, method)
+            self._engine.launch_run(self._task, method, num_runs=num_runs)
 
         self.append(H3(f"Create experiment for {self._task.type_name()}"))
         self.append(
@@ -564,6 +620,7 @@ class DialogNewExperiment(Dialog):
                 ).onchange(handle_change_method),
             ).style({"align-items": "center", "gap": "16px", "font-weight": "bold"})
         )
+        self.append(Row("Number of runs", input_num_runs := Input("number", value=str(1))))
         self.append(form_wrapper)
         self.append(
             Row(

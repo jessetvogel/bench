@@ -277,7 +277,7 @@ class Run:
         raise ValueError(msg)
 
 
-class Bench(ABC):
+class Bench:
     """Specification of the benchmark.
 
     Args:
@@ -291,9 +291,6 @@ class Bench(ABC):
         self._result_types: list[type[Result]] = []
         self._handler_run: Callable[[Task, Method], Result | Token] | None = None
         self._handler_poll: Callable[[Token], Result | None] | None = None
-
-    def set_name(self, name: str) -> None:
-        self._name = name
 
     def add_task_types(self, *types: type[Task]) -> None:
         # TODO: Validate the tasks (are all methods implemented?)

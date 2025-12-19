@@ -52,30 +52,35 @@ class Engine:
         task = task_type(**kwargs)
         self.cache.insert_task(task)
 
-    def launch_run(self, task: Task, method: Method) -> None:
+    def launch_run(self, task: Task, method: Method, *, num_runs: int = 1) -> None:
         """Launch new process to execute a run based on the given task and method.
 
         Args:
             task: Task to execute.
             method: Method to apply to task.
+            num_runs: Number of runs to execute.
         """
         # Make sure task and method are in the database
         self.cache.insert_task(task)
         self.cache.insert_method(method)
 
-        # Create new run with status pending
+        # Create new run(s) with status "pending"
         task_id = hash_serializable(task)
         method_id = hash_serializable(method)
-        run = Run(
-            id=secrets.token_hex(8),
-            task_id=task_id,
-            method_id=method_id,
-            result=None,
-        )
-        self.cache.insert_or_update_run(run)
+        run_ids: list[str] = []
+        for _ in range(num_runs):
+            self.cache.insert_or_update_run(
+                run := Run(
+                    id=secrets.token_hex(8),
+                    task_id=task_id,
+                    method_id=method_id,
+                    result=None,
+                )
+            )
+            run_ids.append(run.id)
 
         # Execute the run as a separate process
-        process = Process(["bench-run", str(self._path), run.id])
+        process = Process(["bench-run", str(self._path), *run_ids])
         self._executions.append(
             Execution(
                 task=task,
@@ -98,7 +103,6 @@ class Engine:
             raise ValueError(msg)
         task = self.cache.select_task(run.task_id)
         method = self.cache.select_method(run.method_id)
-        self._logger.info(f"Executing run {run_id} ..")
         run.result = self._bench.run(task, method)
         self.cache.insert_or_update_run(run)
 
@@ -106,12 +110,10 @@ class Engine:
         if not isinstance(run.result, Result):
             msg = f"Expected run with status 'done', but got {run.status}"
             raise ValueError(msg)
-
         if not hasattr(run, "_metrics"):
             task = self.cache.select_task(run.task_id)
             metrics = task.evaluate(run.result)
             setattr(run, "_metrics", metrics)
-
         return getattr(run, "_metrics")
 
 
