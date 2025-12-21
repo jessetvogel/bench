@@ -100,6 +100,11 @@ class Task(ABC, Serializable):
         return cls.__name__
 
     @classmethod
+    def type_description(cls) -> str:
+        """Description of the class of tasks."""
+        return ""
+
+    @classmethod
     def params(cls) -> list[Param]:
         """Parameters to instantiate this task."""
         return _params_default(cls)
@@ -107,6 +112,10 @@ class Task(ABC, Serializable):
     def label(self) -> str:
         """Display name of the task."""
         return self.type_name()
+
+    def description(self) -> str:
+        """Description of the task."""
+        return f"Task instance of type {self.type_name()}"
 
     @classmethod
     @abstractmethod

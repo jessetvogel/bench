@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
 from typing import Any, Awaitable, Callable, cast
 
 import numpy as np
-from slash.basic import Axes, Checkbox, Icon
+from slash.basic import Axes, Checkbox, Icon, Tooltip
 from slash.basic import FillBetween as SlashFillBetween
 from slash.basic import Graph as SlashGraph
 from slash.basic import Plot as SlashPlot
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
-from slash.html import H2, H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, Pre, Select, Span, Summary
+from slash.html import H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, P, Pre, Select, Span, Summary
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
@@ -21,6 +22,14 @@ from bench.dashboard.utils import Timer, prompt, timedelta_to_str
 from bench.engine import Engine, Execution
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Run, Task
+
+FORM_STYLE = {
+    "display": "grid",
+    "grid-template-columns": "auto 160px",
+    "align-items": "center",
+    "gap": "8px",
+    "min-width": "384px",
+}
 
 
 class Menu(Column):
@@ -54,7 +63,14 @@ class Menu(Column):
         )
 
         # Tasks
-        self.append(self._header("Tasks"))
+        self.append(
+            self._header(
+                "Tasks",
+                Button("+")
+                .onclick(lambda: self._content.set(PageNewTask(self._engine)))
+                .style({"min-width": "inherit", "width": "36px", "height": "36px", "padding": "0px"}),
+            ).style({"justify-content": "space-between", "padding-right": "0px"})
+        )
         for task in self._engine.cache.select_tasks():
 
             def handle_click(event: ClickEvent, task: Task) -> None:
@@ -62,15 +78,8 @@ class Menu(Column):
 
             self.append(self._item(task.label(), onclick=partial(handle_click, task=task)))
 
-        self.append(
-            self._item(
-                "create new task",
-                onclick=lambda: self._content.set(PageNewTask(self._engine)),
-            )
-        )
-
         # --------
-        self.append(self._separator())
+        # self.append(self._separator())
 
         # Info
         # self.append(self._header("Info"))
@@ -203,14 +212,34 @@ class Menu(Column):
 
 
 class PageNewTask(Div):
+    """Page element for creating a new task."""
+
     def __init__(self, engine: Engine) -> None:
         super().__init__()
         self._engine = engine
         self._setup()
 
     def _setup(self) -> None:
-        for task_type in self._engine.bench.task_types:
-            self.append(Button(task_type.type_name()).onclick(lambda: self._create_task(task_type)))
+        self.append(
+            H3("Create new task"),
+            P("Create a new task from one of the following types of tasks."),
+            Div(
+                *[
+                    [
+                        Button(task_type.type_name()).onclick(lambda _, t=task_type: self._create_task(t)),
+                        Span(task_type.type_description()),
+                    ]
+                    for task_type in self._engine.bench.task_types
+                ]
+            ).style(
+                {
+                    "display": "grid",
+                    "grid-template-columns": "repeat(2, max-content)",
+                    "align-items": "center",
+                    "gap": "8px 16px",
+                }
+            ),
+        )
 
     def _create_task(self, task_type: type[Task]) -> None:
         params = task_type.params()
@@ -304,8 +333,13 @@ class PageTask(Div):
         self._setup()
 
     def _setup(self) -> None:
-        self.append(H2(self._task.label()))
-        self.append(Button("Create experiment").onclick(self._create_experiment))
+        # Task label
+        self.append(H3(self._task.label()))
+        # Task description
+        self.append(P(self._task.description()))
+        # Dialog and button for new run
+        self.append(dialog_new_run := DialogNewRun(self._engine, self._task))
+        self.append(Button("New run").onclick(lambda: dialog_new_run.show_modal()))
 
         self.append(H3("Compare methods"))
 
@@ -343,25 +377,22 @@ class PageTask(Div):
                         }
                     ),
                     " ",
-                    f"({len(group.runs)} runs)",
+                    Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
                 )
             ).onclick(update_selected_groups)
             checkboxes.append(checkbox)
 
         self.append(Column(checkboxes))
 
-        self.append(H3("Metrics"))
-
         metrics = self._task.metrics()
 
+        self.append(header_metrics := H3("Metrics"))
+        Effect(lambda: header_metrics.style({"display": None if selected_groups() else "none"}))
         self.append(
             Div(
                 [create_metric_elem(self._engine, name, metric, selected_groups) for name, metric in metrics.items()]
             ).style({"display": "flex", "gap": "16px", "flex-wrap": "wrap"})
         )
-
-    def _create_experiment(self) -> None:
-        DialogNewExperiment(self._engine, self._task).mount().show_modal()
 
 
 def create_metric_elem(engine: Engine, name: str, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:
@@ -429,9 +460,7 @@ class TimeElem(Panel):
 
         for group in groups:
             timedeltas: dict[str, list[timedelta]] = {key: [] for key in keys}
-            for run in group.runs:
-                if run.status != "done":
-                    continue
+            for run in group.runs_done:
                 metrics = self._engine.evaluate_run(run)
                 for key in keys:
                     assert key in metrics, "expected key in metrics"
@@ -504,14 +533,13 @@ class GraphElem(Panel):
         self._axes.clear_plots()
         # Plot each run in each group
         for group in groups:
-            runs = [run for run in group.runs if run.status == "done"]
             # Case "[ ] Show average" is checked
             if self._graph.option_mean_std and self._checkbox_avg.checked:
-                for plot in self._create_avg_std_graphs(runs, group.color):
+                for plot in self._create_avg_std_graphs(group.runs_done, group.color):
                     self._axes.add_plot(plot)
             # Case "[ ] Show average" is not checked
             else:
-                for run in runs:
+                for run in group.runs_done:
                     self._axes.add_plot(self._create_graph(run, group.color))
         # Render if possible
         if self._axes.is_mounted():
@@ -525,7 +553,7 @@ class GraphElem(Panel):
         ys = metrics[self._graph.key_ys]
         return SlashGraph(xs, ys, color=color)
 
-    def _create_avg_std_graphs(self, runs: list[Run], color: str) -> list[SlashPlot]:
+    def _create_avg_std_graphs(self, runs: Collection[Run], color: str) -> list[SlashPlot]:
         # If there are no runs, return an empty list of plots
         if len(runs) == 0:
             return []
@@ -557,6 +585,10 @@ class RunGroup:
     color: str
     runs: list[Run]
 
+    @property
+    def runs_done(self) -> Collection[Run]:
+        return tuple(run for run in self.runs if run.status == "done")
+
 
 COLORS = [
     "var(--blue)",
@@ -583,7 +615,7 @@ def group_runs(runs: list[Run]) -> list[RunGroup]:
     return list(groups.values())
 
 
-class DialogNewExperiment(Dialog):
+class DialogNewRun(Dialog):
     def __init__(self, engine: Engine, task: Task) -> None:
         super().__init__()
         self._engine = engine
@@ -593,37 +625,43 @@ class DialogNewExperiment(Dialog):
     def _setup(self) -> None:
         method_types = {method_type.type_name(): method_type for method_type in self._engine.bench.method_types}
 
-        form_wrapper = Div().style({"margin-top": "16px"})
+        form_wrapper = Div()
 
         def handle_change_method() -> None:
             method_type = method_types[select.value]
+            params = method_type.params()
             form_wrapper.clear()
-            form_wrapper.append(Form(method_type.params()))
+            if params:
+                form_wrapper.append(
+                    Div().style({"background-color": "var(--border-muted)", "height": "1px", "margin": "16px 0px"})
+                )
+            form_wrapper.append(Form(params))
             start.disabled = False
 
         def handle_click_start() -> None:
             method_type = method_types[select.value]
-            form = cast(Form, form_wrapper.children[0])
+            form = cast(Form, form_wrapper.children[-1])
             method = method_type(**{param.name: form.value(param) for param in method_type.params()})
             num_runs = int(input_num_runs.value)
-            self.unmount()
+            self.close()
             self._engine.launch_run(self._task, method, num_runs=num_runs)
 
-        self.append(H3(f"Create experiment for {self._task.type_name()}"))
+        self.append(H3(f"New run for {self._task.label()}"))
         self.append(
-            Row(
-                Span("Select method"),
+            Div(
+                Span("Method"),
                 select := Select(
                     [Option("-", disabled=True, hidden=True)] + [Option(name) for name in method_types]
                 ).onchange(handle_change_method),
-            ).style({"align-items": "center", "gap": "16px", "font-weight": "bold"})
+                Span("Number of runs"),
+                input_num_runs := Input("number", value=str(1)),
+            ).style(FORM_STYLE)
         )
-        self.append(Row("Number of runs", input_num_runs := Input("number", value=str(1))))
         self.append(form_wrapper)
         self.append(
             Row(
                 start := Button("Start").onclick(handle_click_start),
-                Button("Cancel").onclick(lambda: self.unmount()),
+                Button("Cancel").onclick(lambda: self.close()),
             ).style({"justify-content": "center", "gap": "16px", "margin-top": "16px"})
         )
         start.disabled = True
@@ -638,33 +676,32 @@ INPUT_TYPE: dict[type[int | float | str], str] = {
 
 
 class Form(Div):
-    def __init__(self, params: list[Param]) -> None:
+    def __init__(self, params: Collection[Param]) -> None:
         super().__init__()
-        self._params = {param.name: param for param in params}
+        self._params = tuple(params)
         self._setup()
 
     def _setup(self) -> None:
         # Create inputs
         self._inputs: dict[str, Input] = {}
-        for name, param in self._params.items():
-            self._inputs[name] = (input := Input())
+        for param in self._params:
+            self._inputs[param.name] = (input := Input())
             input.type = INPUT_TYPE.get(param.type, "text")
             if param.default is not None:
                 input.value = str(param.default)
 
         # Create grid of inputs
-        self.append(
-            Column(
-                Div(*[[Span(name), self._inputs[name]] for name in self._params]).style(
-                    {
-                        "display": "grid",
-                        "grid-template-columns": "repeat(2, auto)",
-                        "align-items": "center",
-                        "gap": "8px",
-                    }
-                ),
-            ).style({"gap": "16px"})
-        )
+        self.append(div := Div().style(FORM_STYLE))
+        for param in self._params:
+            # Each parameter has a row with name and input
+            label = Row(Span(param.name)).style({"align-items": "center", "gap": "4px"})
+            div.append(label, self._inputs[param.name])
+            # If `param` has description, add help icon with tooltip
+            if param.description is not None:
+                label.append(
+                    icon := Icon("help").style({"color": "var(--gray)", "--icon-size": "20px"}),
+                    Tooltip(param.description, target=icon),
+                )
 
     def value(self, param: Param) -> int | float | str:
         value = self._inputs[param.name].value
