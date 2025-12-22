@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 GRAY = "\033[90m"
 RED = "\033[31m"
@@ -22,8 +23,15 @@ class Formatter(logging.Formatter):
         logging.CRITICAL: fmt_prefix + " " + RED + "CRITICAL" + RESET + ": %(message)s",
     }
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         formatter = logging.Formatter(self.FORMATS.get(record.levelno), self.fmt_date)
+        if record.exc_info:
+            exc_info = record.exc_info
+            record.exc_info, record.exc_text = None, None
+            fmt_msg = formatter.format(record)
+            fmt_exc = f"{GRAY}{''.join(traceback.format_exception(*exc_info))}{RESET}"
+            record.exc_info = exc_info
+            return f"{fmt_msg}\n{fmt_exc}"
         return formatter.format(record)
 
 

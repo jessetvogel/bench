@@ -6,9 +6,13 @@ from datetime import timedelta
 from types import UnionType
 from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_args, get_origin, get_type_hints
 
+from bench.logging import get_logger
+
 PlainData: TypeAlias = str | int | float | bool | None | list["PlainData"] | dict[str, "PlainData"]
 
 T = TypeVar("T")
+
+_LOGGER = get_logger("bench")
 
 
 def default_encode(cls: type[T], object: T) -> PlainData:
@@ -267,3 +271,23 @@ def to_json(object: Serializable | None) -> str:
 def from_json(cls: type[S], data: str) -> S:
     """Deserialize JSON into object."""
     return cls.decode(json.loads(data))
+
+
+def check_serializable(object: Serializable) -> None:
+    """Check if `object` can be encoded and decoded properly.
+
+    Raises:
+        EncodingError: If an exception occurs during encoding of the object.
+        DecodingError: If an exception occurs during decoding of the encoding of the object.
+    """
+    cls = object.__class__
+    try:
+        encoded = object.encode()
+    except Exception as err:
+        msg = f"Exception occurred during encoding '{cls.__name__}'"
+        raise EncodingError(msg) from err
+    try:
+        cls.decode(encoded)
+    except Exception as err:
+        msg = f"Exception occurred during decoding '{cls.__name__}'"
+        raise DecodingError(msg) from err

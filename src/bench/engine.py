@@ -11,6 +11,7 @@ from bench import Bench
 from bench.cache import Cache
 from bench.logging import get_logger
 from bench.process import Process
+from bench.serialization import check_serializable
 from bench.templates import Method, Result, Run, Task
 from bench.utils import hash_serializable
 
@@ -45,13 +46,25 @@ class Engine:
         """Currently running processes."""
         return tuple(self._executions)
 
-    def create_task(self, task_type: type[Task], **kwargs: int | float | str) -> None:
+    def create_task(self, task_type: type[Task], **kwargs: int | float | str) -> Task:
         """Create task of given type with given arguments.
 
         Note: May raise an exception.
         """
         task = task_type(**kwargs)
+        check_serializable(task)
         self.cache.insert_task(task)
+        return task
+
+    def create_method(self, method_type: type[Method], **kwargs: int | float | str) -> Method:
+        """Create method of given type with given arguments.
+
+        Note: May raise an exception.
+        """
+        method = method_type(**kwargs)
+        check_serializable(method)
+        self.cache.insert_method(method)
+        return method
 
     def launch_run(self, task: Task, method: Method, *, num_runs: int = 1) -> None:
         """Launch new process to execute a run based on the given task and method.

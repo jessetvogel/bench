@@ -1,6 +1,9 @@
 from collections.abc import Callable, Iterable
 
+from bench.logging import get_logger
 from bench.templates import Method, Result, Task, Token
+
+_LOGGER = get_logger("bench")
 
 
 class Bench:
@@ -19,16 +22,19 @@ class Bench:
         self._handler_poll: Callable[[Token], Result | None] | None = None
 
     def add_task_types(self, *types: type[Task]) -> None:
-        # TODO: Validate the tasks (are all methods implemented?)
-        self._task_types.extend(types)
+        for task_type in types:
+            if _check_user_type(Task, task_type):
+                self._task_types.extend(types)
 
     def add_method_types(self, *types: type[Method]) -> None:
-        # TODO: Validate the methods (are all methods implemented?)
-        self._method_types.extend(types)
+        for method_type in types:
+            if _check_user_type(Method, method_type):
+                self._method_types.extend(types)
 
     def add_result_types(self, *types: type[Result]) -> None:
-        # TODO: Validate the results (are all methods implemented?)
-        self._result_types.extend(types)
+        for result_type in types:
+            if _check_user_type(Result, result_type):
+                self._result_types.extend(types)
 
     def on_run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
         """Set handler for executing tasks with a method.
@@ -102,3 +108,27 @@ class Bench:
                 return result_type
         msg = f"Unknown result type '{name}'"
         raise ValueError(msg)
+
+
+def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool:
+    """Check if `user_type` is a valid task, method or result type."""
+    # Check if derives from `cls`
+    if not issubclass(user_type, cls):
+        _LOGGER.warning(
+            "Class '%s' must derive from `%s.%s` to be used as %s type",
+            user_type.__name__,
+            cls.__module__,
+            cls.__name__,
+            cls.__name__.lower(),
+        )
+        return False
+    # Check if abstract methods are implemented
+    user_type_abstract_methods = user_type.__abstractmethods__  # type: ignore[attr-defined]
+    if user_type_abstract_methods:
+        _LOGGER.warning(
+            "Class '%s' must implement the following methods before it can be used: %s",
+            user_type.__name__,
+            ", ".join([f"'{f}'" for f in user_type_abstract_methods]),
+        )
+        return False
+    return True

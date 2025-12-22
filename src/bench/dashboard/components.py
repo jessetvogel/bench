@@ -21,6 +21,7 @@ from slash.reactive import Effect, Signal
 from bench.dashboard.ansi import ansi2html
 from bench.dashboard.utils import Timer, prompt, timedelta_to_str
 from bench.engine import Engine, Execution
+from bench.logging import get_logger
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Run, Task
 
@@ -31,6 +32,8 @@ FORM_STYLE = {
     "gap": "8px",
     "min-width": "384px",
 }
+
+_LOGGER = get_logger("bench")
 
 
 class Menu(Column):
@@ -246,7 +249,18 @@ class PageNewTask(Div):
         params = task_type.params()
 
         def handler(values: dict[str, int | float | str]):
-            self._engine.create_task(task_type, **values)
+            try:
+                self._engine.create_task(task_type, **values)
+            except Exception:
+                _LOGGER.exception(
+                    "Failed to create task of type '%s' due to the following exception:",
+                    task_type.__name__,
+                )
+                Session.require().log(
+                    f"Failed to create task of type '{task_type.__name__}'",
+                    details="See the console for details.",
+                    level="error",
+                )
 
         prompt(
             f"Create new {task_type.type_label()}",
@@ -350,6 +364,7 @@ class PageTask(Div):
 
         selected_groups = Signal[list[RunGroup]]([])
 
+        # Create one checkbox row per group
         checkboxes: list[Checkbox] = []
 
         def update_selected_groups() -> None:
@@ -367,6 +382,13 @@ class PageTask(Div):
                 )
                 method_label = "?"
 
+            # Description of the method parameters
+            method_params_description = ",".join(
+                [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.params()]
+            )
+
+            # Checkbox row of the form:
+            # [x] <method label> <num runs> <method params description>
             checkbox = Checkbox(
                 Span(
                     Span(method_label).style(
@@ -379,6 +401,8 @@ class PageTask(Div):
                     ),
                     " ",
                     Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
+                    " ",
+                    Span(method_params_description).style({"color": "var(--gray)", "font-size": "12px"}),
                 )
             ).onclick(update_selected_groups)
             checkboxes.append(checkbox)
@@ -659,11 +683,26 @@ class DialogNewRun(Dialog):
             start.disabled = False
 
         def handle_click_start() -> None:
+            self.close()
             method_type = method_types[select.value]
             form = cast(Form, form_wrapper.children[-1])
-            method = method_type(**{param.name: form.value(param) for param in method_type.params()})
+            method_kwargs = {param.name: form.value(param) for param in method_type.params()}
             num_runs = int(input_num_runs.value)
-            self.close()
+
+            try:
+                method = self._engine.create_method(method_type, **method_kwargs)
+            except Exception:
+                _LOGGER.exception(
+                    "Failed to create method of type '%s' due to the following exception:",
+                    method_type.__name__,
+                )
+                Session.require().log(
+                    f"Failed to create method of type '{method_type.__name__}'",
+                    details="See the console for details.",
+                    level="error",
+                )
+                return
+
             self._engine.launch_run(self._task, method, num_runs=num_runs)
 
         self.append(H3(f"New run for {self._task.label()}"))

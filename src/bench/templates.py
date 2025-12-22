@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from typing import Any, Generic, Literal, Protocol, Self, TypeVar, cast
+from typing import Any, Generic, Literal, Self, TypeVar, cast
 
 from bench.serialization import PlainData, Serializable
 
@@ -133,7 +133,7 @@ class Task(ABC, Serializable):
     def decode(cls, data: PlainData) -> Self: ...
 
 
-class Method(Serializable, Protocol):
+class Method(ABC, Serializable):
     """Abstract base class for a method."""
 
     @classmethod
