@@ -74,7 +74,10 @@ def prompt(
 def timedelta_to_str(t: timedelta) -> str:
     """Format timedelta into read-friendly format."""
     seconds = t.total_seconds()
-    if seconds < 1:
+    if seconds < 1e-3:
+        microseconds = round(seconds * 1e6)
+        return f"{microseconds} µs"
+    elif seconds < 1:
         milliseconds = round(seconds * 1e3)
         return f"{milliseconds} ms"
     elif seconds < 60:

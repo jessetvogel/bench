@@ -14,7 +14,7 @@ class Bench:
         self._name = name
         self._task_types: list[type[Task]] = []
         self._method_types: list[type[Method]] = []
-        self._result_types: list[type[Result]] = []
+        self._result_types: list[type[Result]] = [Result]
         self._handler_run: Callable[[Task, Method], Result | Token] | None = None
         self._handler_poll: Callable[[Token], Result | None] | None = None
 

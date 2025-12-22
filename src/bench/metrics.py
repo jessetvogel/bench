@@ -1,16 +1,14 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
-from types import MappingProxyType
 
 from bench.templates import Metric
 
 
+@dataclass(init=False)
 class Table(Metric):
-    def __init__(self, **kwargs: int | float | str) -> None:
-        self._data = kwargs
+    keys: tuple[str, ...]
 
-    def data(self) -> Mapping[str, int | float | str]:
-        return MappingProxyType(self._data)
+    def __init__(self, *keys: str) -> None:
+        self.keys = keys
 
 
 @dataclass(init=False)

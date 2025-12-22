@@ -8,6 +8,7 @@ from typing import Any, Awaitable, Callable, cast
 
 import numpy as np
 from slash.basic import Axes, Checkbox, Icon, Tooltip
+from slash.basic import DataTable as SlashDataTable
 from slash.basic import FillBetween as SlashFillBetween
 from slash.basic import Graph as SlashGraph
 from slash.basic import Plot as SlashPlot
@@ -390,7 +391,7 @@ class PageTask(Div):
         Effect(lambda: header_metrics.style({"display": None if selected_groups() else "none"}))
         self.append(
             Div([create_metric_elem(self._engine, metric, selected_groups) for metric in metrics]).style(
-                {"display": "flex", "gap": "16px", "flex-wrap": "wrap"}
+                {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
             )
         )
 
@@ -401,7 +402,7 @@ def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[l
     if isinstance(metric, Graph):
         return GraphElem(engine, metric, selected_groups)
     if isinstance(metric, Table):
-        return Div("Metric [Table]")
+        return TableElem(engine, metric, selected_groups)
 
     msg = f"No visualization for metric of type '{type(metric)}'"
     raise NotImplementedError(msg)
@@ -422,30 +423,13 @@ class TimeElem(Panel):
         groups = self._selected_groups()
 
         self.clear()
-        self.style(
-            {
-                "padding": "16px",
-                "display": "none" if len(groups) == 0 else None,
-            }
-        )
-        self.append(
-            Span("Time").style(
-                {
-                    "font-weight": "bold",
-                    "font-size": "1.125rem",
-                    "margin-bottom": "16px",
-                    "display": "block",
-                    "text-align": "center",
-                }
-            ),
-        )
+        self.style({"padding": "16px", "display": "none" if len(groups) == 0 else None})
 
         data = Div().style(
             {
                 "display": "grid",
                 "grid-template-columns": f"repeat({1 + len(keys)}, max-content)",
                 "grid-gap": "8px 16px",
-                "margin": "16px 0px",
                 "align-items": "center",
                 "justify-content": "space-around",
                 "justify-items": "center",
@@ -575,6 +559,44 @@ class GraphElem(Panel):
             ys_high = [float(y + std) for y, std in zip(ys_avg, ys_std)]
             plots.append(SlashFillBetween(xs, ys_low, ys_high, color=color, opacity=0.2))
         return plots
+
+
+class TableElem(Div):
+    """Component to visualize the :py:class:`Table` metric."""
+
+    def __init__(self, engine: Engine, table: Table, selected_groups: Signal[list[RunGroup]]) -> None:
+        super().__init__()
+        self._engine = engine
+        self._table = table
+        self._selected_groups = selected_groups
+        Effect(self._setup)
+
+    def _setup(self) -> None:
+        groups = self._selected_groups()
+
+        self.clear()
+        self.style({"display": "none" if len(groups) == 0 else None})
+
+        self.append(table := SlashDataTable(["Method"] + list(self._table.keys)))
+        data: list = []
+        for group in groups:
+            for run in group.runs_done:
+                metrics = self._engine.evaluate_run(run)
+                datum = {
+                    "Method": Div().style(
+                        {
+                            "width": "24px",
+                            "height": "24px",
+                            "border-radius": "100%",
+                            "background-color": group.color,
+                            "margin": "auto",
+                        }
+                    )
+                }
+                for key in self._table.keys:
+                    datum[key] = metrics[key]
+                data.append(datum)
+        table.set_data(data)
 
 
 @dataclass
