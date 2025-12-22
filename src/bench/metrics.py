@@ -2,9 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-
-class Metric:
-    pass
+from bench.templates import Metric
 
 
 class Table(Metric):

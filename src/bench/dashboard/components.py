@@ -226,7 +226,7 @@ class PageNewTask(Div):
             Div(
                 *[
                     [
-                        Button(task_type.type_name()).onclick(lambda _, t=task_type: self._create_task(t)),
+                        Button(task_type.type_label()).onclick(lambda _, t=task_type: self._create_task(t)),
                         Span(task_type.type_description()),
                     ]
                     for task_type in self._engine.bench.task_types
@@ -248,7 +248,7 @@ class PageNewTask(Div):
             self._engine.create_task(task_type, **values)
 
         prompt(
-            f"Create new {task_type.type_name()}",
+            f"Create new {task_type.type_label()}",
             "Fill in parameters please",
             params,
             handler=handler,
@@ -389,17 +389,17 @@ class PageTask(Div):
         self.append(header_metrics := H3("Metrics"))
         Effect(lambda: header_metrics.style({"display": None if selected_groups() else "none"}))
         self.append(
-            Div(
-                [create_metric_elem(self._engine, name, metric, selected_groups) for name, metric in metrics.items()]
-            ).style({"display": "flex", "gap": "16px", "flex-wrap": "wrap"})
+            Div([create_metric_elem(self._engine, metric, selected_groups) for metric in metrics]).style(
+                {"display": "flex", "gap": "16px", "flex-wrap": "wrap"}
+            )
         )
 
 
-def create_metric_elem(engine: Engine, name: str, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:
+def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:
     if isinstance(metric, Time):
-        return TimeElem(engine, name, metric, selected_groups)
+        return TimeElem(engine, metric, selected_groups)
     if isinstance(metric, Graph):
-        return GraphElem(engine, name, metric, selected_groups)
+        return GraphElem(engine, metric, selected_groups)
     if isinstance(metric, Table):
         return Div("Metric [Table]")
 
@@ -410,10 +410,9 @@ def create_metric_elem(engine: Engine, name: str, metric: Metric, selected_group
 class TimeElem(Panel):
     """Component to visualize the :py:class:`Time` metric."""
 
-    def __init__(self, engine: Engine, name: str, time: Time, selected_groups: Signal[list[RunGroup]]) -> None:
+    def __init__(self, engine: Engine, time: Time, selected_groups: Signal[list[RunGroup]]) -> None:
         super().__init__()
         self._engine = engine
-        self._name = name
         self._time = time
         self._selected_groups = selected_groups
         Effect(self._setup)
@@ -430,7 +429,7 @@ class TimeElem(Panel):
             }
         )
         self.append(
-            Span(self._name).style(
+            Span("Time").style(
                 {
                     "font-weight": "bold",
                     "font-size": "1.125rem",
@@ -489,10 +488,9 @@ class TimeElem(Panel):
 class GraphElem(Panel):
     """Component to visualize the :py:class:`Graph` metric."""
 
-    def __init__(self, engine: Engine, name: str, graph: Graph, selected_groups: Signal[list[RunGroup]]) -> None:
+    def __init__(self, engine: Engine, graph: Graph, selected_groups: Signal[list[RunGroup]]) -> None:
         super().__init__()
         self._engine = engine
-        self._name = name
         self._graph = graph
         self._selected_groups = selected_groups
         self._setup()
@@ -623,7 +621,7 @@ class DialogNewRun(Dialog):
         self._setup()
 
     def _setup(self) -> None:
-        method_types = {method_type.type_name(): method_type for method_type in self._engine.bench.method_types}
+        method_types = {method_type.type_label(): method_type for method_type in self._engine.bench.method_types}
 
         form_wrapper = Div()
 

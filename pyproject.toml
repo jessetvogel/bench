@@ -26,7 +26,14 @@ classifiers = [
 dependencies = ["slash @ git+https://github.com/jessetvogel/slash.git@main"]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy", "pytest"]
+dev = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "sphinx",
+    "sphinx-autodoc-typehints",
+    "sphinx-rtd-theme",
+]
 
 [project.scripts]
 bench-dashboard = "bench.main:main_dashboard"

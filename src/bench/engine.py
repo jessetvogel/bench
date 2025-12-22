@@ -7,10 +7,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from bench import Bench
 from bench.cache import Cache
 from bench.logging import get_logger
 from bench.process import Process
-from bench.templates import Bench, Method, Result, Run, Task
+from bench.templates import Method, Result, Run, Task
 from bench.utils import hash_serializable
 
 

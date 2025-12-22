@@ -1,0 +1,175 @@
+body {
+    /* Colors */
+    --white: #ffffff;
+    --black: #101010;
+    --gray: #777;
+    --light-gray: #ccc;
+    --dark-gray: #333;
+
+    --red: #c04016;
+    --orange: #e27b2d;
+    --yellow: #e2a32d;
+    --green: #589e3c;
+    --teal: #1a8e75;
+    --blue: #1a7d8e;
+    --indigo: #4058b0;
+    --purple: #6b50a2;
+    --pink: #ce5ca7;
+    --aubergine: #a23f61;
+
+    --primary-color: var(--blue);
+    --secondary-color: var(--yellow);
+
+    --bg-dark: #f1efec;
+    --bg: #f8f7f6;
+    --bg-light: #fff;
+
+    --fg: var(--black);
+
+    --border: #bbb;
+    --border-light: #ccc;
+
+    --button-bg: var(--white);
+    --button-bg-hover: #eee;
+    --button-text-color: var(--black);
+    --button-border: 1px solid var(--border-light);
+
+    --input-bg-color: var(--white);
+    --input-text-color: var(--black);
+    --input-border: 1px solid var(--border-light);
+
+    --pre-bg-color: #eee;
+    --pre-text-color: #574f43;
+    --pre-border: 1px solid var(--border);
+
+    --dialog-bg-color: var(--bg);
+    --dialog-border: 1px solid var(--border);
+    --dialog-backdrop-color: rgba(0, 0, 0, 0.075);
+
+    --blockquote-bg-color: #eee;
+    --blockquote-text-color: #444;
+
+    --error-text-color: var(--red);
+    --info-text-color: var(--blue);
+    --warning-text-color: var(--yellow);
+    --debug-text-color: var(--green);
+
+    --shadow: 0px 0px 8px rgba(0, 0, 0, 0.075);
+    --invert-filter: invert(0);
+}
+
+.wy-nav-content-wrap,
+.wy-nav-content {
+    background-color: var(--bg);
+
+    a,
+    a:visited {
+        color: var(--blue);
+    }
+}
+
+.wy-nav-side {
+    background-color: var(--dark-gray);
+}
+
+.wy-side-nav-search,
+.wy-nav-top {
+    background-color: var(--blue);
+
+    a,
+    a:visited {
+        color: var(--white);
+    }
+}
+
+.wy-menu-vertical {
+
+    p.caption {
+        color: color-mix(in srgb, var(--blue) 75%, white);
+        letter-spacing: 1px;
+    }
+}
+
+img.logo {
+    max-height: 48px;
+}
+
+.btn {
+    box-shadow: none !important;
+    padding: 6px 12px !important;
+
+    &.btn-neutral {
+        background-color: var(--white) !important;
+
+        &:hover {
+            background-color: #eee !important;
+        }
+    }
+
+    &:focus {
+        transition: 0s outline;
+        outline: 1px solid var(--blue) !important;
+        outline-offset: 1px;
+    }
+}
+
+.wy-side-nav-search input[type="text"] {
+    border-radius: 4px;
+    border-color: var(--light-gray);
+}
+
+dl.py.property {
+    display: block !important;
+}
+
+dl.py.class>dt.sig.sig-object.py,
+dl.py.exception>dt.sig.sig-object.py {
+    border-top: 3px solid var(--blue) !important;
+    color: var(--blue) !important;
+    background-color: color-mix(in srgb, var(--blue) 10%, var(--bg)) !important;
+}
+
+dl.py.property>dt.sig.sig-object.py {
+    border-left: 3px solid var(--gray) !important;
+    color: var(--gray) !important;
+    background-color: color-mix(in srgb, var(--gray) 10%, var(--bg)) !important;
+}
+
+.rst-content {
+    div[class^="highlight"] {
+        background-color: var(--white);
+        border-radius: 4px;
+    }
+}
+
+.highlight {
+
+    .k,
+    .kn {
+        color: var(--green);
+    }
+
+    .s2 {
+        color: var(--red);
+    }
+
+    .nn,
+    .nf {
+        color: var(--blue);
+    }
+
+    .vm {
+        color: var(--indigo);
+    }
+
+    .gp {
+        color: var(--light-gray);
+    }
+}
+
+code.docutils.literal.notranslate {
+    color: var(--red);
+    border-radius: 2px;
+    padding: 3px;
+    margin: 0px 1px;
+}

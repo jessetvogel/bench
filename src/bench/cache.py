@@ -3,9 +3,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from bench import Bench
 from bench.logging import get_logger
 from bench.serialization import from_json, to_json
-from bench.templates import Bench, BenchError, Method, Result, Run, Task, Token
+from bench.templates import BenchError, Method, Result, Run, Task, Token
 from bench.utils import hash_serializable
 
 BENCH_CACHE = ".bench_cache"
@@ -73,7 +74,7 @@ class Cache:
         cursor.execute("SELECT 1 FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
         if cursor.fetchone() is not None:
             return
-        task_type = task.type_name()
+        task_type = task.type_label()
         task_blob = to_json(task).encode()
         cursor.execute("INSERT INTO `tasks` VALUES (?, ?, ?)", (task_id, task_type, task_blob))
         self._db.commit()
@@ -85,7 +86,7 @@ class Cache:
         cursor.execute("SELECT 1 FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
         if cursor.fetchone() is not None:
             return
-        method_type = method.type_name()
+        method_type = method.type_label()
         method_blob = to_json(method).encode()
         cursor.execute("INSERT INTO `methods` VALUES (?, ?, ?)", (method_id, method_type, method_blob))
         self._db.commit()
@@ -93,7 +94,7 @@ class Cache:
     def insert_or_update_run(self, run: Run) -> None:
         """Insert run into database, or update it if already in the database."""
         result_blob = to_json(run.result).encode()
-        result_type_name = run.result.type_name() if isinstance(run.result, Result) else ""
+        result_type_name = run.result.type_label() if isinstance(run.result, Result) else ""
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `runs` WHERE `id` = ? LIMIT 1", (run.id,))
         if cursor.fetchone() is not None:
