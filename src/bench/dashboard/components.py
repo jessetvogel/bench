@@ -7,7 +7,7 @@ from functools import partial
 from typing import Any, Awaitable, Callable, cast
 
 import numpy as np
-from slash.basic import Axes, Checkbox, Icon, Tooltip
+from slash.basic import Axes, Checkbox, Icon, Tooltip, confirm
 from slash.basic import DataTable as SlashDataTable
 from slash.basic import FillBetween as SlashFillBetween
 from slash.basic import Graph as SlashGraph
@@ -68,12 +68,9 @@ class Menu(Column):
 
         # Tasks
         self.append(
-            self._header(
-                "Tasks",
-                Button("+")
-                .onclick(lambda: self._content.set(PageNewTask(self._engine)))
-                .style({"min-width": "inherit", "width": "36px", "height": "36px", "padding": "0px"}),
-            ).style({"justify-content": "space-between", "padding-right": "0px"})
+            self._header("Tasks", mini_button("+").onclick(lambda: self._content.set(PageNewTask(self._engine)))).style(
+                {"justify-content": "space-between", "padding-right": "0px"}
+            )
         )
         for task in self._engine.cache.select_tasks():
 
@@ -168,7 +165,7 @@ class Menu(Column):
                 icon = Icon("")
                 status = Signal(execution.process.poll())
                 Effect(lambda: icon.set_icon(self.icon_status(status())))
-                statuses[execution.run.id] = status
+                statuses[execution.id] = status
 
                 def handle_click(event: ClickEvent, execution: Execution) -> None:
                     self._click_process(execution)
@@ -196,7 +193,7 @@ class Menu(Column):
 
             def refresh_statuses() -> None:
                 for execution in self._executions():
-                    statuses[execution.run.id].set(execution.process.poll())
+                    statuses[execution.id].set(execution.process.poll())
 
             column.append(Timer(refresh_statuses, seconds=1.0, repeat=True))
 
@@ -356,19 +353,30 @@ class PageTask(Div):
         self.append(dialog_new_run := DialogNewRun(self._engine, self._task))
         self.append(Button("New run").onclick(lambda: dialog_new_run.show_modal()))
 
-        self.append(H3("Compare methods"))
+        # Method selection
+        self.append(
+            Row(
+                H3("Compare methods"),
+                button_trash := mini_button(
+                    Icon("trash").style({"opacity": "0.8", "--icon-size": "20px"}),
+                ).onclick(self._delete_selected_runs),
+            ).style({"align-items": "center", "gap": "16px"})
+        )
 
         runs = self._engine.cache.select_runs(self._task)
 
         groups = group_runs(runs)
 
-        selected_groups = Signal[list[RunGroup]]([])
+        self._selected_groups = Signal[list[RunGroup]]([])
+
+        # Disable delete button when no groups are selected
+        Effect(lambda: button_trash.set_disabled(not self._selected_groups()))
 
         # Create one checkbox row per group
         checkboxes: list[Checkbox] = []
 
         def update_selected_groups() -> None:
-            selected_groups.set([group for group, checkbox in zip(groups, checkboxes) if checkbox.checked])
+            self._selected_groups.set([group for group, checkbox in zip(groups, checkboxes) if checkbox.checked])
 
         for group in groups:
             try:
@@ -383,7 +391,7 @@ class PageTask(Div):
                 method_label = "?"
 
             # Description of the method parameters
-            method_params_description = ",".join(
+            method_params_description = ", ".join(
                 [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.params()]
             )
 
@@ -412,12 +420,39 @@ class PageTask(Div):
         metrics = self._task.metrics()
 
         self.append(header_metrics := H3("Metrics"))
-        Effect(lambda: header_metrics.style({"display": None if selected_groups() else "none"}))
+        Effect(lambda: header_metrics.style({"display": None if self._selected_groups() else "none"}))
         self.append(
-            Div([create_metric_elem(self._engine, metric, selected_groups) for metric in metrics]).style(
+            Div([create_metric_elem(self._engine, metric, self._selected_groups) for metric in metrics]).style(
                 {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
             )
         )
+
+    async def _delete_selected_runs(self) -> None:
+        # TODO: Clean up this method .. Contains duplicate code I think
+        selected_groups = self._selected_groups()
+        msg = Column(
+            Span("Are you sure you want to delete the following runs?").style({"font-weight": "bold"}),
+            Span("This action is irreversible."),
+            [
+                Span(
+                    Span(self._engine.cache.select_method(group.method_id).label()).style(
+                        {
+                            "background-color": group.color,
+                            "color": "var(--white)",
+                            "padding": "3px 6px",
+                            "border-radius": "4px",
+                        }
+                    ),
+                    " ",
+                    Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
+                )
+                for group in selected_groups
+            ],
+        ).style({"gap": "12px"})
+        if await confirm(msg):
+            runs = [run for group in selected_groups for run in group.runs]
+            self._engine.delete_runs(runs)
+            # TODO: refresh?
 
 
 def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:
@@ -769,3 +804,17 @@ class Form(Div):
         if param.type is float:
             return float(value)
         return str(value)
+
+
+def mini_button(*children: Children) -> Button:
+    return Button(*children).style(
+        {
+            "min-width": "inherit",
+            "width": "36px",
+            "height": "36px",
+            "padding": "0px",
+            "display": "flex",
+            "justify-content": "center",
+            "align-items": "center",
+        }
+    )

@@ -25,7 +25,8 @@ class Cache:
     def __init__(self, bench: Bench) -> None:
         self._bench = bench
         self._logger = get_logger("bench")
-
+        self._tasks: dict[str, Task] = {}
+        self._methods: dict[str, Method] = {}
         self._setup()
 
     def _setup(self) -> None:
@@ -70,6 +71,7 @@ class Cache:
     def insert_task(self, task: Task) -> None:
         """Insert task into database, if not already."""
         task_id = hash_serializable(task)
+        self._tasks[task_id] = task
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
         if cursor.fetchone() is not None:
@@ -82,6 +84,7 @@ class Cache:
     def insert_method(self, method: Method) -> None:
         """Insert method into database, if not already."""
         method_id = hash_serializable(method)
+        self._methods[method_id] = method
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
         if cursor.fetchone() is not None:
@@ -117,6 +120,8 @@ class Cache:
         Raises an exception no task can be found with the given ID.
         Raises an exception when the task cannot be deserialized properly.
         """
+        if task_id in self._tasks:
+            return self._tasks[task_id]
         cursor = self._db.cursor()
         cursor.execute("SELECT `type`, `data` FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
         if (row := cursor.fetchone()) is None:
@@ -125,7 +130,9 @@ class Cache:
         task_type_name, task_blob = row
         assert isinstance(task_type_name, str)
         assert isinstance(task_blob, bytes)
-        return self._parse_task(task_type_name, task_blob)
+        task = self._parse_task(task_type_name, task_blob)
+        self._tasks[task_id] = task
+        return task
 
     def select_method(self, method_id: str) -> Method:
         """Get method by id.
@@ -133,6 +140,8 @@ class Cache:
         Raises an exception no method can be found with the given ID.
         Raises an exception when the method cannot be deserialized properly.
         """
+        if method_id in self._methods:
+            return self._methods[method_id]
         cursor = self._db.cursor()
         cursor.execute("SELECT `type`, `data` FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
         if (row := cursor.fetchone()) is None:
@@ -141,7 +150,9 @@ class Cache:
         method_type_name, method_blob = row
         assert isinstance(method_type_name, str)
         assert isinstance(method_blob, bytes)
-        return self._parse_method(method_type_name, method_blob)
+        method = self._parse_method(method_type_name, method_blob)
+        self._methods[method_id] = method
+        return method
 
     def select_run(self, run_id: str) -> Run:
         """Get run by ID."""
@@ -223,6 +234,16 @@ class Cache:
                 self._logger.error(msg)
             runs.append(run)
         return runs
+
+    def delete_runs(self, runs: list[Run]) -> None:
+        """Delete runs from the database."""
+        cursor = self._db.cursor()
+        BATCH_SIZE = 128  # delete in batches for efficiency
+        for i in range(0, len(runs), BATCH_SIZE):
+            run_ids = tuple(run.id for run in runs[i : i + BATCH_SIZE])
+            placeholders = ",".join(["?" for _ in run_ids])
+            cursor.execute(f"DELETE FROM `runs` WHERE `id` IN ({placeholders})", run_ids)
+        self._db.commit()
 
     def _parse_task(self, task_type_name: str, task_blob: bytes) -> Task:
         task_type = self._bench.get_task_type(task_type_name)

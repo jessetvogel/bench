@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import secrets
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -81,39 +80,27 @@ class Engine:
         # Create new run(s) with status "pending"
         task_id = hash_serializable(task)
         method_id = hash_serializable(method)
-        run_ids: list[str] = []
-        for _ in range(num_runs):
-            self.cache.insert_or_update_run(
-                run := Run(
-                    id=secrets.token_hex(8),
-                    task_id=task_id,
-                    method_id=method_id,
-                    result=None,
-                )
-            )
-            run_ids.append(run.id)
 
         # Execute the run as a separate process
-        process = Process(["bench-run", str(self._path), *run_ids])
+        process = Process(["bench-run", str(self._path), task_id, method_id, "-n", str(num_runs)])
         self._executions.append(
             Execution(
                 task=task,
                 method=method,
-                run=run,
+                num_runs=num_runs,
                 created_at=datetime.now(),
                 process=process,
             )
         )
 
-    def execute_run(self, run_id: str) -> None:
-        """Execute run with given id.
+    def execute_run(self, run: Run) -> None:
+        """Execute run.
 
         Args:
-            run_id: ID of the run to execute.
+            run: Run to execute.
         """
-        run = self.cache.select_run(run_id)
         if run.status != "pending":
-            msg = f"Expected run {run_id} to be pending, but is {run.status}"
+            msg = f"Expected run {run.id} to be pending, but is {run.status}"
             raise ValueError(msg)
         task = self.cache.select_task(run.task_id)
         method = self.cache.select_method(run.method_id)
@@ -129,6 +116,9 @@ class Engine:
             metrics = task.evaluate(run.result)
             setattr(run, "_metrics", metrics)
         return getattr(run, "_metrics")
+
+    def delete_runs(self, runs: Iterable[Run]) -> None:
+        self.cache.delete_runs(list(runs))
 
 
 def load_bench(path: Path) -> Bench:
@@ -168,6 +158,10 @@ def load_bench(path: Path) -> Bench:
 class Execution:
     task: Task
     method: Method
-    run: Run
+    num_runs: int
     created_at: datetime
     process: Process
+
+    @property
+    def id(self) -> str:
+        return str(self.created_at)
