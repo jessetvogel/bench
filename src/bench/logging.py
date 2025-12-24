@@ -16,7 +16,7 @@ class Formatter(logging.Formatter):
     fmt_date = "%H:%M:%S"
 
     FORMATS = {
-        logging.INFO: fmt_prefix + " " + WHITE + "INFO" + RESET + ": %(message)s",
+        logging.INFO: fmt_prefix + " " + BLUE + "INFO" + RESET + ": %(message)s",
         logging.DEBUG: fmt_prefix + " " + BLUE + "DEBUG" + RESET + ": %(message)s",
         logging.WARNING: fmt_prefix + " " + YELLOW + "WARNING" + RESET + ": %(message)s",
         logging.ERROR: fmt_prefix + " " + RED + "ERROR" + RESET + ": %(message)s",

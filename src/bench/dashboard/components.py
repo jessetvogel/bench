@@ -18,7 +18,7 @@ from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench.dashboard.ansi import ansi2html
-from bench.dashboard.utils import RunGroup, Timer, group_runs, timedelta_to_str
+from bench.dashboard.utils import RunGroup, Timer, get_color, timedelta_to_str
 from bench.engine import Engine, Execution
 from bench.logging import get_logger
 from bench.metrics import Graph, Metric, Table, Time
@@ -362,6 +362,8 @@ class PageTask(Div):
         super().__init__()
         self._engine = engine
         self._task = task
+        self._groups: dict[str, RunGroup] = {}
+        self._selected_groups = Signal[list[RunGroup]]([])
         self._setup()
 
     def _setup(self) -> None:
@@ -389,26 +391,60 @@ class PageTask(Div):
                 Tooltip("Delete selected runs", target=button_delete),
             ).style({"align-items": "center", "gap": "16px"})
         )
-
-        runs = self._engine.cache.select_runs(self._task)
-
-        groups = group_runs(runs)
-
-        self._selected_groups = Signal[list[RunGroup]]([])
-
         # Disable delete button when no groups are selected
         Effect(lambda: button_delete.set_disabled(not self._selected_groups()))
+        # Checkboxes
+        self._column_checkboxes = Column()
+        self.append(self._column_checkboxes)
+        # Metrics
+        metrics = self._task.metrics()
+        self.append(
+            header_metrics := H3("Metrics"),
+            Div([create_metric_elem(self._engine, metric, self._selected_groups) for metric in metrics]).style(
+                {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
+            ),
+        )
+        Effect(lambda: header_metrics.style({"display": None if self._selected_groups() else "none"}))
+        # Refresh runs
+        self._refresh_runs()
 
-        # Create one checkbox row per group
+    def _refresh_runs(self) -> None:
+        # Re-fill groups with all runs belonging to task
+        # Create new groups for new methods
+        runs = self._engine.cache.select_runs(self._task)
+        for group in self._groups.values():
+            group.runs = []
+        for run in runs:
+            if run.method_id not in self._groups:
+                self._groups[run.method_id] = RunGroup(
+                    method_id=run.method_id, runs=[], color=get_color(len(self._groups))
+                )
+            self._groups[run.method_id].runs.append(run)
+
+        # TODO: Find a better way of detecting if changes were made. Note that this must include
+        # (1) new runs, (2) removed runs, (3) run changed status, (4) more ?
+        changes = True
+
+        if changes:
+            self._update_checkboxes()
+            self._selected_groups.trigger()  # FIXME: Any way to circumvent this?
+
+    def _update_checkboxes(self) -> None:
+        self._column_checkboxes.clear()
         checkboxes: list[Checkbox] = []
 
-        def update_selected_groups() -> None:
-            self._selected_groups.set([group for group, checkbox in zip(groups, checkboxes) if checkbox.checked])
+        def handle_click_checkbox() -> None:
+            self._selected_groups.set([group for group, cb in zip(self._groups.values(), checkboxes) if cb.checked])
 
-        for group in groups:
+        selected_method_ids = set(group.method_id for group in self._selected_groups())
+        for method_id, group in self._groups.items():
+            # Construct method label and parameter description
             try:
-                method = self._engine.cache.select_method(group.method_id)
+                method = self._engine.cache.select_method(method_id)
                 method_label = method.label()
+                method_params_description = ", ".join(
+                    [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.params()]
+                )
             except Exception as err:
                 Session.require().log(
                     f"Failed to get method with ID {group.method_id}",
@@ -416,12 +452,7 @@ class PageTask(Div):
                     level="error",
                 )
                 method_label = "?"
-
-            # Description of the method parameters
-            method_params_description = ", ".join(
-                [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.params()]
-            )
-
+                method_params_description = ""
             # Checkbox row of the form:
             # [x] <method label> <num runs> <method params description>
             checkbox = Checkbox(
@@ -438,21 +469,12 @@ class PageTask(Div):
                     Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
                     " ",
                     Span(method_params_description).style({"color": "var(--gray)", "font-size": "12px"}),
-                )
-            ).onclick(update_selected_groups)
+                ),
+                checked=method_id in selected_method_ids,  # checked if group was already selected
+                disabled=not group.runs_done,  # disabled if no runs
+            ).onclick(handle_click_checkbox)
             checkboxes.append(checkbox)
-
-        self.append(Column(checkboxes))
-
-        metrics = self._task.metrics()
-
-        self.append(header_metrics := H3("Metrics"))
-        Effect(lambda: header_metrics.style({"display": None if self._selected_groups() else "none"}))
-        self.append(
-            Div([create_metric_elem(self._engine, metric, self._selected_groups) for metric in metrics]).style(
-                {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
-            )
-        )
+            self._column_checkboxes.append(checkbox)
 
     async def _delete_selected_runs(self) -> None:
         # TODO: Clean up this method .. Contains duplicate code I think
@@ -479,10 +501,8 @@ class PageTask(Div):
         if await confirm(msg):
             runs = [run for group in selected_groups for run in group.runs]
             self._engine.delete_runs(runs)
-            # TODO: refresh?
-
-    def _refresh_runs(self) -> None:
-        Session.require().log("TODO: implement", level="debug")
+            self._selected_groups.set([])
+            self._refresh_runs()
 
 
 def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:

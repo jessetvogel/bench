@@ -91,12 +91,5 @@ COLORS = [
 ]
 
 
-def group_runs(runs: list[Run]) -> list[RunGroup]:
-    color_index = 0
-    groups: dict[str, RunGroup] = {}
-    for run in runs:
-        if run.method_id not in groups:
-            groups[run.method_id] = RunGroup(method_id=run.method_id, runs=[], color=COLORS[color_index % len(COLORS)])
-            color_index += 1
-        groups[run.method_id].runs.append(run)
-    return list(groups.values())
+def get_color(index: int) -> str:
+    return COLORS[index % len(COLORS)]

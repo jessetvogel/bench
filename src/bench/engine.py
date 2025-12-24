@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import secrets
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +12,7 @@ from bench.cache import Cache
 from bench.logging import get_logger
 from bench.process import Process
 from bench.serialization import check_serializable
-from bench.templates import Method, Result, Run, Task
+from bench.templates import BenchError, Method, Result, Run, Task, Token
 from bench.utils import hash_serializable
 
 
@@ -93,19 +94,30 @@ class Engine:
             )
         )
 
-    def execute_run(self, run: Run) -> None:
-        """Execute run.
+    def execute_run(self, task: Task, method: Method) -> Run:
+        """Execute run from task and method.
 
         Args:
-            run: Run to execute.
+            task: Task to execute.
+            method: Method to apply to task.
         """
-        if run.status != "pending":
-            msg = f"Expected run {run.id} to be pending, but is {run.status}"
-            raise ValueError(msg)
-        task = self.cache.select_task(run.task_id)
-        method = self.cache.select_method(run.method_id)
-        run.result = self._bench.run(task, method)
+        # Perform task with method
+        result: Result | Token | BenchError
+        try:
+            result = self._bench.run(task, method)
+        except Exception as err:
+            result = BenchError(str(err))
+        # Create run from result
+        run = Run(
+            id=secrets.token_hex(8),
+            task_id=hash_serializable(task),
+            method_id=hash_serializable(method),
+            result=result,
+        )
+        # Store run
         self.cache.insert_or_update_run(run)
+
+        return run
 
     def evaluate_run(self, run: Run) -> dict[str, Any]:
         if not isinstance(run.result, Result):

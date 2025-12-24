@@ -1,12 +1,10 @@
 import argparse
-import secrets
 from pathlib import Path
 from typing import cast
 
 from bench.dashboard import Dashboard
 from bench.engine import Engine
 from bench.logging import get_logger
-from bench.templates import Run
 
 
 def main_dashboard() -> None:
@@ -57,31 +55,24 @@ def main_run() -> None:
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    # try:
     # Create engine
     engine = Engine(path)
 
+    # Get task and method by ID (TODO: Surround with try-catch and do proper error handling)
+    task = engine.cache.select_task(task_id)
+    method = engine.cache.select_method(method_id)
+
     for it in range(num_runs):
-        # Create new run
-        run = Run(
-            id=secrets.token_hex(8),
-            task_id=task_id,
-            method_id=method_id,
-            result=None,
-        )
-
         # Execute run
-        logger.info(f"Executing run {it + 1}/{num_runs} (ID {run.id})..")
-        engine.execute_run(run)
+        logger.info(f"Executing run {it + 1}/{num_runs} ..")
+        run = engine.execute_run(task, method)
 
-        # Insert result into cache
-        engine.cache.insert_or_update_run(run)
+        # If run failed, stop
+        if run.status == "failed":
+            break
 
     # Done
     logger.info("Done!")
-    # except Exception as err:
-    #     logger.error(f"({type(err).__name__}) {err}")
-    #     sys.exit(1)
 
     # profiler.disable()
     # profiler.dump_stats("profile_results.stats")

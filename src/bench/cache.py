@@ -263,10 +263,8 @@ class Cache:
     def _parse_run(
         self, run_id: str, task_id: str, method_id: str, status: str, result_type_name: str, result_blob: bytes
     ) -> Run:
-        result: None | Token | Result | BenchError
+        result: Result | Token | BenchError
         if status == "pending":
-            result = None
-        elif status == "running":
             result = from_json(Token, result_blob.decode())
         elif status == "done":
             result_type = self._bench.get_result_type(result_type_name)

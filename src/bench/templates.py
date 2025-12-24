@@ -225,7 +225,7 @@ class BenchError(Exception, Serializable):
 
 
 class Run:
-    def __init__(self, id: str, task_id: str, method_id: str, result: None | Token | Result | BenchError) -> None:
+    def __init__(self, id: str, task_id: str, method_id: str, result: Result | Token | BenchError) -> None:
         self._id = id
         self._task_id = task_id
         self._method_id = method_id
@@ -244,25 +244,23 @@ class Run:
         return self._method_id
 
     @property
-    def result(self) -> None | Token | Result | BenchError:
+    def result(self) -> Result | Token | BenchError:
         return self._result
 
     @result.setter
-    def result(self, result: None | Token | Result | BenchError) -> None:
+    def result(self, result: Result | Token | BenchError) -> None:
         self._result = result
 
     @property
-    def status(self) -> Literal["pending", "running", "done", "failed"]:
-        if self.result is None:
-            return "pending"
+    def status(self) -> Literal["pending", "done", "failed"]:
         if isinstance(self.result, Token):
-            return "running"
+            return "pending"
         if isinstance(self.result, Result):
             return "done"
         if isinstance(self.result, BenchError):
             return "failed"
 
-        msg = f"Expected result of run to be `None`, `Token`, `Result` or `BenchError`, got `{type(self.result)}`"
+        msg = f"Expected result of run to be of type `Token`, `Result` or `BenchError`, but got `{type(self.result)}`"
         raise ValueError(msg)
 
 
