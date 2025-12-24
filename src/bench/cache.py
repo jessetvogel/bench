@@ -27,6 +27,7 @@ class Cache:
         self._logger = get_logger("bench")
         self._tasks: dict[str, Task] = {}
         self._methods: dict[str, Method] = {}
+        self._runs: dict[str, Run] = {}
         self._setup()
 
     def _setup(self) -> None:
@@ -227,11 +228,17 @@ class Cache:
             assert isinstance(status, str)
             assert isinstance(result_type_name, str)
             assert isinstance(result_blob, bytes)
-            try:
-                run = self._parse_run(run_id, task_id, method_id, status, result_type_name, result_blob)
-            except Exception as err:
-                msg = f"Failed to deserialize method of type '{result_type_name}' ({err}):\n\n{result_blob.decode()}"
-                self._logger.error(msg)
+            if run_id in self._runs:
+                run = self._runs[run_id]
+            else:
+                try:
+                    run = self._parse_run(run_id, task_id, method_id, status, result_type_name, result_blob)
+                except Exception as err:
+                    self._logger.error(
+                        f"Failed to deserialize method of type '{result_type_name}' ({err}):\n\n{result_blob.decode()}"
+                    )
+                if run.status != "pending" and run.status != "running":
+                    self._runs[run_id] = run
             runs.append(run)
         return runs
 

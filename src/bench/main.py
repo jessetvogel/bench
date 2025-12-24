@@ -1,5 +1,4 @@
 import argparse
-import cProfile
 import secrets
 from pathlib import Path
 from typing import cast
@@ -55,8 +54,8 @@ def main_run() -> None:
 
     # TODO: validate input
 
-    profiler = cProfile.Profile()
-    profiler.enable()
+    # profiler = cProfile.Profile()
+    # profiler.enable()
 
     # try:
     # Create engine
@@ -84,5 +83,5 @@ def main_run() -> None:
     #     logger.error(f"({type(err).__name__}) {err}")
     #     sys.exit(1)
 
-    profiler.disable()
-    profiler.dump_stats("profile_results.stats")
+    # profiler.disable()
+    # profiler.dump_stats("profile_results.stats")

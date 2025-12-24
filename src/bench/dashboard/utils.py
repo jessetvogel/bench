@@ -1,74 +1,12 @@
-from collections.abc import Callable
+from collections.abc import Callable, Collection
+from dataclasses import dataclass
 from datetime import timedelta
 
-from slash.core import Elem, Handler, Session
+from slash.core import Elem, Session
 from slash.events import ClickEvent, SupportsOnClick
-from slash.html import Button, Dialog, Div, Input, Span
 from slash.js import JSFunction
-from slash.layout import Column, Row
 
-from bench.templates import Param
-
-INPUT_TYPE: dict[type[int | float | str], str] = {
-    bool: "number",
-    int: "number",
-    float: "number",
-    str: "text",
-}
-
-
-def prompt(
-    title: str,
-    description: str,
-    params: list[Param],
-    handler: Handler[dict[str, int | float | str]],
-) -> None:
-    # Create inputs
-    inputs: dict[str, Input] = {}
-    for param in params:
-        inputs[param.name] = (input := Input())
-        input.type = INPUT_TYPE.get(param.type, "text")
-        if param.default is not None:
-            input.value = str(param.default)
-
-    dialog: Dialog
-
-    def submit() -> None:
-        dialog.close()
-        values: dict[str, int | float | str] = {}
-        for param in params:
-            value = inputs[param.name].value
-            if param.type is bool:
-                values[param.name] = bool(value)
-            elif param.type is int:
-                values[param.name] = int(value)
-            elif param.type is float:
-                values[param.name] = float(value)
-            else:
-                values[param.name] = value
-        Session.require().call_handler(handler, values)
-
-    dialog = Dialog(
-        Column(
-            Div(title).style({"font-size": "1.5rem", "font-weight": "bold"}),
-            Div(description),
-            Div(*[[Span(param.name), inputs[param.name]] for param in params]).style(
-                {
-                    "display": "grid",
-                    "grid-template-columns": "repeat(2, auto)",
-                    "align-items": "center",
-                    "gap": "8px",
-                }
-            ),
-            Row(
-                Button("Submit").onclick(submit),
-                Button("Cancel").onclick(lambda: dialog.close()),
-            ).style({"justify-content": "center", "gap": "16px"}),
-        ).style({"gap": "16px"})
-    ).style({"max-width": "512px"})
-
-    dialog.mount()
-    dialog.show_modal()
+from bench.templates import Run
 
 
 def timedelta_to_str(t: timedelta) -> str:
@@ -126,3 +64,39 @@ class Timer(Elem, SupportsOnClick):
         self._callback()
         if self._repeat:
             self._start_timer()
+
+
+@dataclass
+class RunGroup:
+    method_id: str
+    color: str
+    runs: list[Run]
+
+    @property
+    def runs_done(self) -> Collection[Run]:
+        return tuple(run for run in self.runs if run.status == "done")
+
+
+COLORS = [
+    "var(--blue)",
+    "var(--yellow)",
+    "var(--green)",
+    "var(--red)",
+    "var(--indigo)",
+    "var(--orange)",
+    "var(--purple)",
+    "var(--teal)",
+    "var(--pink)",
+    "var(--aubergine)",
+]
+
+
+def group_runs(runs: list[Run]) -> list[RunGroup]:
+    color_index = 0
+    groups: dict[str, RunGroup] = {}
+    for run in runs:
+        if run.method_id not in groups:
+            groups[run.method_id] = RunGroup(method_id=run.method_id, runs=[], color=COLORS[color_index % len(COLORS)])
+            color_index += 1
+        groups[run.method_id].runs.append(run)
+    return list(groups.values())

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from dataclasses import dataclass
 from datetime import timedelta
 from functools import partial
-from typing import Any, Awaitable, Callable, cast
+from typing import Any, Awaitable, Callable
 
 import numpy as np
 from slash.basic import Axes, Checkbox, Icon, Tooltip, confirm
@@ -19,11 +18,13 @@ from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench.dashboard.ansi import ansi2html
-from bench.dashboard.utils import Timer, prompt, timedelta_to_str
+from bench.dashboard.utils import RunGroup, Timer, group_runs, timedelta_to_str
 from bench.engine import Engine, Execution
 from bench.logging import get_logger
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Run, Task
+
+_LOGGER = get_logger("bench")
 
 FORM_STYLE = {
     "display": "grid",
@@ -32,8 +33,6 @@ FORM_STYLE = {
     "gap": "8px",
     "min-width": "384px",
 }
-
-_LOGGER = get_logger("bench")
 
 
 class Menu(Column):
@@ -241,33 +240,52 @@ class PageNewTask(Div):
                 }
             ),
         )
+        self._dialog_new_task: DialogNewTask | None = None
 
     def _create_task(self, task_type: type[Task]) -> None:
-        params = task_type.params()
+        if self._dialog_new_task is not None:
+            self._dialog_new_task.unmount()
+        self._dialog_new_task = DialogNewTask(self._engine, task_type).mount().show_modal()
 
-        def handler(values: dict[str, int | float | str]):
-            try:
-                self._engine.create_task(task_type, **values)
-            except Exception:
-                _LOGGER.exception(
-                    "Failed to create task of type '%s' due to the following exception:",
-                    task_type.__name__,
-                )
-                Session.require().log(
-                    f"Failed to create task of type '{task_type.__name__}'",
-                    details="See the console for details.",
-                    level="error",
-                )
 
-        prompt(
-            f"Create new {task_type.type_label()}",
-            "Fill in parameters please",
-            params,
-            handler=handler,
+class DialogNewTask(Dialog):
+    def __init__(self, engine: Engine, task_type: type[Task]) -> None:
+        super().__init__()
+        self._engine = engine
+        self._task_type = task_type
+        self._setup()
+
+    def _setup(self) -> None:
+        self.append(
+            H3(f"Create task of type {self._task_type.type_label()}"),
+            form := Form(self._task_type.params()),
+            Row(
+                Button("Create").onclick(self._handle_click_create),
+                Button("Cancel").onclick(lambda: self.close()),
+            ).style({"justify-content": "center", "gap": "16px", "margin-top": "16px"}),
         )
+        self._form = form
+
+    def _handle_click_create(self) -> None:
+        self.close()
+        task_kwargs = {param.name: self._form.value(param) for param in self._task_type.params()}
+        try:
+            self._engine.create_task(self._task_type, **task_kwargs)
+        except Exception:
+            _LOGGER.exception(
+                "Failed to create task of type '%s' due to the following exception:",
+                self._task_type.__name__,
+            )
+            Session.require().log(
+                f"Failed to create task of type '{self._task_type.__name__}'",
+                details="See the console for details.",
+                level="error",
+            )
 
 
 class PageProcess(Div):
+    """Page element for seeing the progress of a process."""
+
     def __init__(self, engine: Engine, execution: Execution) -> None:
         super().__init__()
         self._engine = engine
@@ -338,6 +356,8 @@ class PageProcess(Div):
 
 
 class PageTask(Div):
+    """Page element for a task."""
+
     def __init__(self, engine: Engine, task: Task) -> None:
         super().__init__()
         self._engine = engine
@@ -349,17 +369,24 @@ class PageTask(Div):
         self.append(H3(self._task.label()))
         # Task description
         self.append(P(self._task.description()))
-        # Dialog and button for new run
+        # Dialog for new run
         self.append(dialog_new_run := DialogNewRun(self._engine, self._task))
-        self.append(Button("New run").onclick(lambda: dialog_new_run.show_modal()))
-
         # Method selection
         self.append(
             Row(
                 H3("Compare methods"),
-                button_trash := mini_button(
+                button_new_run := mini_button(
+                    Span("+").style({"opacity": "0.8"}),
+                ).onclick(lambda: dialog_new_run.show_modal()),
+                Tooltip("New run", target=button_new_run),
+                button_refresh := mini_button(
+                    Icon("refresh").style({"opacity": "0.8", "--icon-size": "20px"}),
+                ).onclick(self._refresh_runs),
+                Tooltip("Refresh", target=button_refresh),
+                button_delete := mini_button(
                     Icon("trash").style({"opacity": "0.8", "--icon-size": "20px"}),
                 ).onclick(self._delete_selected_runs),
+                Tooltip("Delete selected runs", target=button_delete),
             ).style({"align-items": "center", "gap": "16px"})
         )
 
@@ -370,7 +397,7 @@ class PageTask(Div):
         self._selected_groups = Signal[list[RunGroup]]([])
 
         # Disable delete button when no groups are selected
-        Effect(lambda: button_trash.set_disabled(not self._selected_groups()))
+        Effect(lambda: button_delete.set_disabled(not self._selected_groups()))
 
         # Create one checkbox row per group
         checkboxes: list[Checkbox] = []
@@ -432,7 +459,7 @@ class PageTask(Div):
         selected_groups = self._selected_groups()
         msg = Column(
             Span("Are you sure you want to delete the following runs?").style({"font-weight": "bold"}),
-            Span("This action is irreversible."),
+            Span("This action can not be undone!"),
             [
                 Span(
                     Span(self._engine.cache.select_method(group.method_id).label()).style(
@@ -453,6 +480,9 @@ class PageTask(Div):
             runs = [run for group in selected_groups for run in group.runs]
             self._engine.delete_runs(runs)
             # TODO: refresh?
+
+    def _refresh_runs(self) -> None:
+        Session.require().log("TODO: implement", level="debug")
 
 
 def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:
@@ -658,42 +688,6 @@ class TableElem(Div):
         table.set_data(data)
 
 
-@dataclass
-class RunGroup:
-    method_id: str
-    color: str
-    runs: list[Run]
-
-    @property
-    def runs_done(self) -> Collection[Run]:
-        return tuple(run for run in self.runs if run.status == "done")
-
-
-COLORS = [
-    "var(--blue)",
-    "var(--yellow)",
-    "var(--green)",
-    "var(--red)",
-    "var(--indigo)",
-    "var(--orange)",
-    "var(--purple)",
-    "var(--teal)",
-    "var(--pink)",
-    "var(--aubergine)",
-]
-
-
-def group_runs(runs: list[Run]) -> list[RunGroup]:
-    color_index = 0
-    groups: dict[str, RunGroup] = {}
-    for run in runs:
-        if run.method_id not in groups:
-            groups[run.method_id] = RunGroup(method_id=run.method_id, runs=[], color=COLORS[color_index % len(COLORS)])
-            color_index += 1
-        groups[run.method_id].runs.append(run)
-    return list(groups.values())
-
-
 class DialogNewRun(Dialog):
     def __init__(self, engine: Engine, task: Task) -> None:
         super().__init__()
@@ -702,74 +696,68 @@ class DialogNewRun(Dialog):
         self._setup()
 
     def _setup(self) -> None:
-        method_types = {method_type.type_label(): method_type for method_type in self._engine.bench.method_types}
-
-        form_wrapper = Div()
-
-        def handle_change_method() -> None:
-            method_type = method_types[select.value]
-            params = method_type.params()
-            form_wrapper.clear()
-            if params:
-                form_wrapper.append(
-                    Div().style({"background-color": "var(--border-muted)", "height": "1px", "margin": "16px 0px"})
-                )
-            form_wrapper.append(Form(params))
-            start.disabled = False
-
-        def handle_click_start() -> None:
-            self.close()
-            method_type = method_types[select.value]
-            form = cast(Form, form_wrapper.children[-1])
-            method_kwargs = {param.name: form.value(param) for param in method_type.params()}
-            num_runs = int(input_num_runs.value)
-
-            try:
-                method = self._engine.create_method(method_type, **method_kwargs)
-            except Exception:
-                _LOGGER.exception(
-                    "Failed to create method of type '%s' due to the following exception:",
-                    method_type.__name__,
-                )
-                Session.require().log(
-                    f"Failed to create method of type '{method_type.__name__}'",
-                    details="See the console for details.",
-                    level="error",
-                )
-                return
-
-            self._engine.launch_run(self._task, method, num_runs=num_runs)
-
-        self.append(H3(f"New run for {self._task.label()}"))
+        self._method_types = {method_type.type_label(): method_type for method_type in self._engine.bench.method_types}
         self.append(
+            H3(f"New run for {self._task.label()}"),
             Div(
                 Span("Method"),
-                select := Select(
-                    [Option("-", disabled=True, hidden=True)] + [Option(name) for name in method_types]
-                ).onchange(handle_change_method),
+                select_method := Select(
+                    [Option("-", disabled=True, hidden=True)] + [Option(name) for name in self._method_types]
+                ).onchange(self._handle_change_method),
                 Span("Number of runs"),
                 input_num_runs := Input("number", value=str(1)),
-            ).style(FORM_STYLE)
-        )
-        self.append(form_wrapper)
-        self.append(
+            ).style(FORM_STYLE),
+            form_wrapper := Div(),
             Row(
-                start := Button("Start").onclick(handle_click_start),
+                button_start := Button("Start").onclick(self._handle_click_start).set_disabled(True),
                 Button("Cancel").onclick(lambda: self.close()),
-            ).style({"justify-content": "center", "gap": "16px", "margin-top": "16px"})
+            ).style({"justify-content": "center", "gap": "16px", "margin-top": "16px"}),
         )
-        start.disabled = True
+        self._select_method = select_method
+        self._input_num_runs = input_num_runs
+        self._form_wrapper = form_wrapper
+        self._button_start = button_start
 
+    def _handle_change_method(self) -> None:
+        method_params = self._method_types[self._select_method.value].params()
+        self._form_wrapper.clear()
+        if method_params:
+            self._form_wrapper.append(
+                Div().style({"background-color": "var(--border-muted)", "height": "1px", "margin": "16px 0px"})
+            )
+        self._form = Form(method_params)
+        self._form_wrapper.append(self._form)
+        self._button_start.set_disabled(False)
 
-INPUT_TYPE: dict[type[int | float | str], str] = {
-    bool: "number",
-    int: "number",
-    float: "number",
-    str: "text",
-}
+    def _handle_click_start(self) -> None:
+        self.close()
+        method_type = self._method_types[self._select_method.value]
+        method_kwargs = {param.name: self._form.value(param) for param in method_type.params()}
+        num_runs = int(self._input_num_runs.value)
+        try:
+            method = self._engine.create_method(method_type, **method_kwargs)
+        except Exception:
+            _LOGGER.exception(
+                "Failed to create method of type '%s' due to the following exception:",
+                method_type.__name__,
+            )
+            Session.require().log(
+                f"Failed to create method of type '{method_type.__name__}'",
+                details="See the console for details.",
+                level="error",
+            )
+            return
+        self._engine.launch_run(self._task, method, num_runs=num_runs)
 
 
 class Form(Div):
+    INPUT_TYPE: dict[type[int | float | str], str] = {
+        bool: "number",
+        int: "number",
+        float: "number",
+        str: "text",
+    }
+
     def __init__(self, params: Collection[Param]) -> None:
         super().__init__()
         self._params = tuple(params)
@@ -780,7 +768,7 @@ class Form(Div):
         self._inputs: dict[str, Input] = {}
         for param in self._params:
             self._inputs[param.name] = (input := Input())
-            input.type = INPUT_TYPE.get(param.type, "text")
+            input.type = Form.INPUT_TYPE.get(param.type, "text")
             if param.default is not None:
                 input.value = str(param.default)
 
