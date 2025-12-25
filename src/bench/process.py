@@ -30,6 +30,16 @@ class Process:
         self._stdout = ""
         self._stderr = ""
 
+    @property
+    def stdout(self) -> str:
+        """Current stdout output."""
+        return self._stdout
+
+    @property
+    def stderr(self) -> str:
+        """Current stderr output."""
+        return self._stderr
+
     def poll(self) -> int | None:
         # Get status of the process
         status = self._process.poll()
@@ -52,12 +62,5 @@ class Process:
 
         return status
 
-    @property
-    def stdout(self) -> str:
-        """Current stdout output."""
-        return self._stdout
-
-    @property
-    def stderr(self) -> str:
-        """Current stderr output."""
-        return self._stderr
+    def kill(self) -> None:
+        self._process.kill()

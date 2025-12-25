@@ -4,22 +4,22 @@ from typing import Any
 _ANSI2HTML_STYLES: dict[str, Any] = {}
 ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\d+)*)?([cnRhlABCDfsurgKJipm]))")
 ANSI2HTML_PALETTE = [
-    "var(--black)",
+    "var(--text-muted)",
     "var(--red)",
     "var(--green)",
     "var(--yellow)",
     "var(--blue)",
     "var(--purple)",
     "var(--teal)",
-    "var(--white)",
-    "var(--black)",
+    "var(--text)",
+    "var(--text)",
     "var(--red)",
     "var(--green)",
     "var(--yellow)",
     "var(--blue)",
     "var(--purple)",
     "var(--teal)",
-    "var(--white)",
+    "var(--text-muted)",
 ]
 
 

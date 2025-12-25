@@ -318,7 +318,13 @@ class PageProcess(Div):
 
         self.clear()
         self.append(
-            H3("Process information"),
+            Row(
+                H3("Process information"),
+                button_cancel := mini_button(Icon("cancel").style({"opacity": "0.8", "--icon-size": "20px"})).onclick(
+                    self._cancel_process
+                ),
+                Tooltip("Cancel process", target=button_cancel),
+            ).style({"gap": "16px", "align-items": "center"}),
             Div(
                 Span("Task").style({"font-weight": "bold"}),
                 Span(task.label()),
@@ -345,6 +351,8 @@ class PageProcess(Div):
                 ).set_attr("open", "")
             ),
         )
+        # Disable button if process is closed
+        Effect(lambda: button_cancel.set_disabled(status() is not None))
 
     def _process_status(self, status: int | None) -> Elem:
         if status is None:
@@ -353,6 +361,10 @@ class PageProcess(Div):
             return Span("Done").style({"font-weight": "bold", "color": "var(--green)"})
         else:
             return Span("Failed").style({"font-weight": "bold", "color": "var(--red)"})
+
+    async def _cancel_process(self) -> None:
+        if await confirm("Are you sure you want to cancel this process?"):
+            self._execution.process.kill()
 
 
 class PageTask(Div):

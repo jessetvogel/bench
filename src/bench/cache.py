@@ -237,7 +237,7 @@ class Cache:
                     self._logger.error(
                         f"Failed to deserialize method of type '{result_type_name}' ({err}):\n\n{result_blob.decode()}"
                     )
-                if run.status != "pending" and run.status != "running":
+                if run.status != "pending":
                     self._runs[run_id] = run
             runs.append(run)
         return runs
@@ -272,6 +272,6 @@ class Cache:
         elif status == "failed":
             result = from_json(BenchError, result_blob.decode())
         else:
-            msg = f"Encountered status '{status}', expected 'running', 'done' or 'failed'"
+            msg = f"Encountered status '{status}', expected 'pending', 'done' or 'failed'"
             raise RuntimeError(msg)
         return Run(run_id, task_id, method_id, result)
