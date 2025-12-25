@@ -50,29 +50,32 @@ def main_run() -> None:
     num_runs: int = args.n
     # verbose: bool = args.verbose
 
-    # TODO: validate input
+    # Validate input
+    if num_runs <= 0:
+        logger.error("Number of runs must be a positive integer")
+        return
 
-    # profiler = cProfile.Profile()
-    # profiler.enable()
+    if not path.is_file():
+        logger.error(f"Path `{path}` does not exist")
+        return
 
-    # Create engine
-    engine = Engine(path)
+    try:
+        # Create engine
+        engine = Engine(path)
+        # Get task and method by ID
+        task = engine.cache.select_task(task_id)
+        method = engine.cache.select_method(method_id)
+    except Exception as err:
+        logger.error(str(err))
+        return
 
-    # Get task and method by ID (TODO: Surround with try-catch and do proper error handling)
-    task = engine.cache.select_task(task_id)
-    method = engine.cache.select_method(method_id)
-
+    # Execute runs
     for it in range(num_runs):
-        # Execute run
         logger.info(f"Executing run {it + 1}/{num_runs} ..")
         run = engine.execute_run(task, method)
-
         # If run failed, stop
         if run.status == "failed":
-            break
+            return
 
     # Done
     logger.info("Done!")
-
-    # profiler.disable()
-    # profiler.dump_stats("profile_results.stats")

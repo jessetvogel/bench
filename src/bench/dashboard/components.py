@@ -797,13 +797,7 @@ class Form(Div):
 
     def _setup(self) -> None:
         # Create inputs
-        self._inputs: dict[str, Input] = {}
-        for param in self._params:
-            self._inputs[param.name] = (input := Input())
-            input.type = Form.INPUT_TYPE.get(param.type, "text")
-            if param.default is not None:
-                input.value = str(param.default)
-
+        self._inputs = {param.name: self._create_input(param) for param in self._params}
         # Create grid of inputs
         self.append(div := Div().style(FORM_STYLE))
         for param in self._params:
@@ -816,6 +810,21 @@ class Form(Div):
                     icon := Icon("help").style({"color": "var(--gray)", "--icon-size": "20px"}),
                     Tooltip(param.description, target=icon),
                 )
+
+    def _create_input(self, param: Param) -> Input | Select:
+        # If options are given, use a `Select` element
+        if param.options is not None:
+            select = Select([Option(str(option)) for option in param.options])
+            if param.default is not None:
+                select.value = str(param.default)
+            return select
+        # If no options are given, use an `Input` element
+        else:
+            input = Input()
+            input.type = Form.INPUT_TYPE.get(param.type, "text")
+            if param.default is not None:
+                input.value = str(param.default)
+            return input
 
     def value(self, param: Param) -> int | float | str:
         value = self._inputs[param.name].value

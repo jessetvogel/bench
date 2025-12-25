@@ -29,7 +29,7 @@ class Formatter(logging.Formatter):
             exc_info = record.exc_info
             record.exc_info, record.exc_text = None, None
             fmt_msg = formatter.format(record)
-            fmt_exc = f"{GRAY}{''.join(traceback.format_exception(*exc_info))}{RESET}"
+            fmt_exc = f"{YELLOW}{''.join(traceback.format_exception(*exc_info))}{RESET}"
             record.exc_info = exc_info
             return f"{fmt_msg}\n{fmt_exc}"
         return formatter.format(record)

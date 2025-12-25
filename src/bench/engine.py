@@ -107,6 +107,7 @@ class Engine:
             result = self._bench.run(task, method)
         except Exception as err:
             result = BenchError(str(err))
+            self._logger.exception("Run failed due to the following error:")
         # Create run from result
         run = Run(
             id=secrets.token_hex(8),

@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-from typing import Any, Generic, Literal, Self, TypeVar, cast
+from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from bench.serialization import PlainData, Serializable
 
@@ -16,6 +16,7 @@ class Param(Generic[T]):
     Args:
         name: Name of the parameter.
         type: Type of the parameter.
+        options: List of allowed values of the parameter.
         default: Default value of the parameter.
         description: Description of the parameter.
         min: Minimum value of the parameter.
@@ -27,6 +28,7 @@ class Param(Generic[T]):
         name: str,
         type: type[T],
         *,
+        options: list[T] | None = None,
         default: T | None = None,
         description: str | None = None,
         min: int | float | None = None,
@@ -34,6 +36,7 @@ class Param(Generic[T]):
     ) -> None:
         self._name = name
         self._type = type
+        self._options = options
         self._default = default
         self._description = description
         self._min = min
@@ -46,6 +49,10 @@ class Param(Generic[T]):
     @property
     def type(self) -> type[T]:
         return self._type
+
+    @property
+    def options(self) -> list[T] | None:
+        return self._options
 
     @property
     def default(self) -> T | None:
@@ -68,25 +75,29 @@ def _params_default(cls) -> list[Param]:
     """Default implementation of `.params()` of `Task` and `Method` using type hints."""
     params: list[Param] = []
     signature = inspect.signature(cls.__init__)
+    type_hints = get_type_hints(cls.__init__)
     for name, param in signature.parameters.items():
         if name == "self":
             continue
         if param.kind is param.VAR_POSITIONAL or param.kind is param.VAR_KEYWORD:
             continue
-
-        annotation = param.annotation
-        if isinstance(annotation, type):
-            annotation = annotation.__name__
-
-        type_ = {
-            "bool": bool,
-            "int": int,
-            "float": float,
-            "str": str,
-        }.get(annotation, str)
-
+        # Get type hint
+        type_hint = type_hints.get(param.name, None)
+        # Set `options` if type hint is `Literal`
+        options = list(get_args(type_hint)) if get_origin(type_hint) is Literal else None
+        # Type of `Param` is `int`, `float` or `str`, with `str` being the default
+        if type_hint not in (int, float, str):
+            type_hint = str
+        # Determine default value
         default = param.default if param.default != param.empty else None
-        params.append(Param(name=name, type=type_, default=default))
+        # If annotation is `typing.Annotated[T, x]`, then interpret `x` as parameter description
+        description: str | None = None
+        if get_origin(param.annotation) is Annotated:
+            annotation_args = get_args(param.annotation)
+            if len(annotation_args) == 2:
+                description = str(annotation_args[1])
+        # Create `Param` from obtained information
+        params.append(Param(name=name, type=type_hint, options=options, default=default, description=description))
     return params
 
 
