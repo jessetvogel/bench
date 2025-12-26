@@ -10,9 +10,6 @@ from bench.metrics import Table, Time
 from bench.serialization import PlainData
 from bench.templates import Method, Metric, Result, Task
 
-# Create `Bench` instance
-bench = Bench("Root finding")
-
 
 # Task types
 class Cubic(Task):
@@ -102,7 +99,7 @@ class NewtonSolver(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls(data["x_0"], data["eps"])
 
-    def solve(self, cubic: Cubic) -> Result:
+    def find_root(self, cubic: Cubic) -> Result:
         # Apply 1,000 iterations to update `x` with Newton's method
         num_iters = 1_000
         num_evals = 0
@@ -117,6 +114,10 @@ class NewtonSolver(Method):
         return Result(x=x, num_evals=num_evals)
 
 
+# Create `Bench` instance
+bench = Bench("Root finding")
+
+
 # Add the task and method types to the bench
 bench.add_task_types(Cubic)
 bench.add_method_types(RandomSolver, NewtonSolver)
@@ -128,7 +129,7 @@ def run(task: Task, method: Method) -> Result:
     assert isinstance(method, RandomSolver | NewtonSolver)
 
     start_time = time.perf_counter()
-    result = method.solve(task)
+    result = method.find_root(task)
     end_time = time.perf_counter()
     result["seconds"] = end_time - start_time
     return result

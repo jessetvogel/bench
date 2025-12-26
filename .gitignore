@@ -8,3 +8,6 @@ __pycache__/
 
 # Temporary files
 tmp/
+
+# Build
+build
