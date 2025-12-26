@@ -1,18 +1,28 @@
-# BENCH
+<img src="img/banner.png" style="height: 80px;"/>
 
-BENCH is a Python framework for benchmarking.
+Bench is a Python framework for benchmarking.
 
 ## 📦 Installation
 
-The BENCH package can be installed directly using `pip`.
+Bench can be installed directly using `pip`.
 
 ```sh
 pip install "bench @ git+https://ci.tno.nl/gitlab/jesse.vogel-tno/bench.git@main"
 ```
 
+Alternatively, bench can be installed by adding the following dependency to your
+`pyproject.toml` file.
+
+```toml
+[project]
+dependencies = [
+  "bench @ git+https://ci.tno.nl/gitlab/jesse.vogel-tno/bench.git@main"
+]
+```
+
 ## 💬 Description
 
-BENCH is a Python framework for benchmarking. It handles data management and provides a user interface for starting experiments and comparing the results for different methods.
+Bench is a Python framework for benchmarking. It handles data management and provides a user interface for starting experiments and comparing the results for different methods.
 
 The user only has to provide what a *task* is, and what a *method* is, and how to execute a task given a method.
 
@@ -53,18 +63,18 @@ from typing import Self
 
 class MyTask(Task):
 
-    @classmethod
-    def metrics(self) -> list[Metric]:
-        ...
-
-    def evaluate(self, result: Result) -> dict[str, Any]:
-        ...
-
     def encode(self) -> PlainData:
         ...
 
     @classmethod
     def decode(cls, data: PlainData) -> Self:
+        ...
+
+    @classmethod
+    def metrics(self) -> list[Metric]:
+        ...
+
+    def evaluate(self, result: Result) -> dict[str, Any]:
         ...
 ```
 
