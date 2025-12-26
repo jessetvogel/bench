@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -75,6 +76,7 @@ def main_run() -> None:
         run = engine.execute_run(task, method)
         # If run failed, stop
         if run.status == "failed":
+            sys.exit(1)
             return
 
     # Done

@@ -41,7 +41,7 @@ bench-run = "bench.main:main_run"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
-package-data = {}
+package-data = { bench = ["assets/**/*"] }
 
 [tool.setuptools.packages.find]
 where = ["src"]

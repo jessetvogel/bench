@@ -71,7 +71,7 @@ class RandomSolver(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls(data["x_min"], data["x_max"])
 
-    def solve(self, cubic: Cubic) -> Result:
+    def find_root(self, cubic: Cubic) -> Result:
         # Sample the function at 1,000 random points
         # and keep track of the best x value
         num_evals = 1_000
