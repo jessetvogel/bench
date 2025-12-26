@@ -7,7 +7,7 @@ Bench is a Python framework for benchmarking.
 Bench can be installed directly using `pip`.
 
 ```sh
-pip install "bench @ git+https://ci.tno.nl/gitlab/jesse.vogel-tno/bench.git@main"
+pip install "bench @ git+https://github.com/jessetvogel/bench.git@main"
 ```
 
 Alternatively, bench can be installed by adding the following dependency to your
@@ -16,7 +16,7 @@ Alternatively, bench can be installed by adding the following dependency to your
 ```toml
 [project]
 dependencies = [
-  "bench @ git+https://ci.tno.nl/gitlab/jesse.vogel-tno/bench.git@main"
+  "bench @ git+https://github.com/jessetvogel/bench.git@main"
 ]
 ```
 
