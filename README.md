@@ -28,7 +28,7 @@ The user only has to provide what a *task* is, and what a *method* is, and how t
 
 ## 🚀 Getting started
 
-Create a file `main.py` with the following contents.
+Create a file `my_benchmark.py` with the following contents.
 
 ```python
 from bench import Bench
@@ -50,7 +50,7 @@ def run(task: MyTask, method: MyMethod) -> MyResult:
     return MyResult(...)
 ```
 
-Run the command `bench-dashboard main.py` to start the BENCH dashboard.
+Run the command `bench-dashboard my_benchmark.py` to start the bench dashboard.
 
 ### Tasks
 

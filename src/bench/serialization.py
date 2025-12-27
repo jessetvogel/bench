@@ -9,6 +9,7 @@ from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_a
 from bench._logging import get_logger
 
 PlainData: TypeAlias = str | int | float | bool | None | list["PlainData"] | dict[str, "PlainData"]
+"""Type alias for plain data, that is, JSON-like data such as primitives, lists and string-keyed dictionaries."""
 
 T = TypeVar("T")
 

@@ -1,3 +1,5 @@
+"""Bench is a Python framework for benchmarking."""
+
 from bench._bench import Bench
 
 __all__ = ["Bench"]

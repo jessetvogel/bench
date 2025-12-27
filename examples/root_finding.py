@@ -26,7 +26,7 @@ class Cubic(Task):
     def metrics(self) -> list[Metric]:
         return [Time("time"), Table("x", "abs(y)", "calls to f(x)")]
 
-    def evaluate(self, result: Result) -> dict[str, Any]:
+    def analyze(self, result: Result) -> dict[str, Any]:
         x = result["x"]
         y = self.f(x)
         return {

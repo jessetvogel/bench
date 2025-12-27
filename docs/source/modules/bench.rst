@@ -5,9 +5,9 @@ bench package
    :maxdepth: 4
    :hidden:
 
+   bench.templates
    bench.metrics
    bench.serialization
-   bench.templates
 
 .. automodule:: bench
    :members:

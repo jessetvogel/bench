@@ -123,7 +123,9 @@ dl.py.property {
 }
 
 dl.py.class>dt.sig.sig-object.py,
-dl.py.exception>dt.sig.sig-object.py {
+dl.py.exception>dt.sig.sig-object.py,
+dl.py.function>dt.sig.sig-object.py,
+dl.py.data>dt.sig.sig-object.py {
     border-top: 3px solid var(--blue) !important;
     color: var(--blue) !important;
     background-color: color-mix(in srgb, var(--blue) 10%, var(--bg)) !important;

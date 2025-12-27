@@ -9,7 +9,10 @@ _LOGGER = get_logger("bench")
 
 
 class Bench:
-    """Specification of the benchmark.
+    """Benchmark specification class.
+
+    This class contains information about the types of tasks, methods and results of a benchmark,
+    as well as how to execute those tasks with those methods.
 
     Args:
         name: Name of the benchmark.
@@ -24,16 +27,31 @@ class Bench:
         self._handler_poll: Callable[[Token], Result | None] | None = None
 
     def add_task_types(self, *types: type[Task]) -> None:
+        """Add user-defined task types to the benchmark.
+
+        Args:
+            types: Task types to add.
+        """
         for task_type in types:
             if _check_user_type(Task, task_type):
                 self._task_types.extend(types)
 
     def add_method_types(self, *types: type[Method]) -> None:
+        """Add user-defined method types to the benchmark.
+
+        Args:
+            types: Method types to add.
+        """
         for method_type in types:
             if _check_user_type(Method, method_type):
                 self._method_types.extend(types)
 
     def add_result_types(self, *types: type[Result]) -> None:
+        """Add user-defined result types to the benchmark.
+
+        Args:
+            types: Result types to add.
+        """
         for result_type in types:
             if _check_user_type(Result, result_type):
                 self._result_types.extend(types)
@@ -44,13 +62,23 @@ class Bench:
         Args:
             handler: Function that executes a task with a method. The function should return
                 a :py:class:`Result` instance if the task can be completed at once.
-                Otherwise, a :py:class:`Token` instance is returned which can be used
-                to obtain the result at a later time.
+                Otherwise, a :py:class:`Token` instance is returned, which can be used
+                to obtain the result at a later time using :py:meth:`poll`.
         """
         # TODO: validate handler
         self._handler_run = handler
 
     def run(self, task: Task, method: Method) -> Result | Token:
+        """Execute the task with the method using the user-defined run handler set by :py:meth:`on_run`.
+
+        Args:
+            task: Task to perform.
+            method: Method to perform the task with.
+
+        Returns:
+            A :py:class:`Result` instance if the task is completed at once, or a :py:class:`Token`
+            instance to obtain the result at a later time using :py:meth:`poll`.
+        """
         if self._handler_run is None:
             msg = "No run handler was registered. Use the `on_run` method to register a handler."
             raise RuntimeError(msg)
@@ -68,6 +96,14 @@ class Bench:
         self._handler_poll = handler
 
     def poll(self, token: Token) -> Result | None:
+        """Poll for a result using the poll handler set by :py:meth:`on_poll`.
+
+        Args:
+            token: Token instance returned from :py:meth:`run`.
+
+        Returns:
+            A :py:class:`Result` instance if the task is completed, otherwise :py:const:`None`.
+        """
         if self._handler_poll is None:
             msg = "No poll handler was registered. Use the `on_poll` method to register a handler."
             raise RuntimeError(msg)
@@ -80,17 +116,25 @@ class Bench:
 
     @property
     def task_types(self) -> Iterable[type[Task]]:
+        """Iterable over all user-defined task types."""
         return iter(self._task_types)
 
     @property
     def method_types(self) -> Iterable[type[Method]]:
+        """Iterable over all user-defined method types."""
         return iter(self._method_types)
 
     @property
     def result_types(self) -> Iterable[type[Result]]:
+        """Iterable over all user-defined result types."""
         return iter(self._result_types)
 
     def get_task_type(self, name: str) -> type[Task]:
+        """Get user-defined task type by name.
+
+        Args:
+            name: Name of task type.
+        """
         for task_type in self._task_types:
             if task_type.type_label() == name:
                 return task_type
@@ -98,6 +142,11 @@ class Bench:
         raise ValueError(msg)
 
     def get_method_type(self, name: str) -> type[Method]:
+        """Get user-defined method type by name.
+
+        Args:
+            name: Name of method type.
+        """
         for method_type in self._method_types:
             if method_type.type_label() == name:
                 return method_type
@@ -105,6 +154,11 @@ class Bench:
         raise ValueError(msg)
 
     def get_result_type(self, name: str) -> type[Result]:
+        """Get user-defined result type by name.
+
+        Args:
+            name: Name of result type.
+        """
         for result_type in self._result_types:
             if result_type.type_label() == name:
                 return result_type

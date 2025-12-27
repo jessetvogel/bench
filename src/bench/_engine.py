@@ -126,7 +126,7 @@ class Engine:
             raise ValueError(msg)
         if not hasattr(run, "_metrics"):
             task = self.cache.select_task(run.task_id)
-            metrics = task.evaluate(run.result)
+            metrics = task.analyze(run.result)
             setattr(run, "_metrics", metrics)
         return getattr(run, "_metrics")
 

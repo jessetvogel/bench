@@ -138,11 +138,11 @@ class Task(ABC, Serializable):
     @classmethod
     @abstractmethod
     def metrics(self) -> Collection[Metric]:
-        """Parse result into metrics."""
+        """Metrics for the task."""
 
     @abstractmethod
-    def evaluate(self, result: Result) -> dict[str, Any]:
-        """Evaluate the result into metrics."""
+    def analyze(self, result: Result) -> dict[str, Any]:
+        """Analyze the result and produce values for the metrics."""
 
     @abstractmethod
     def encode(self) -> PlainData: ...
@@ -231,7 +231,7 @@ class Result(Serializable):
 
 
 class BenchError(Exception, Serializable):
-    """Exception raised for BENCH errors.
+    """Exception raised for bench errors.
 
     Args:
         message: Error message.

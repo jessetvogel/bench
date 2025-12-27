@@ -13,7 +13,7 @@ def main_dashboard() -> int:
     # Parse arguments
     parser = argparse.ArgumentParser(
         prog="bench-dashboard",
-        description="Start BENCH dashboard",
+        description="Start bench dashboard",
     )
     parser.add_argument("path", type=str, help="Path to Python file containing `Bench` class")
     args = parser.parse_args()
