@@ -57,10 +57,6 @@ def main_run() -> int:
         logger.error("Number of runs must be a positive integer, got %d", num_runs)
         return 1
 
-    if not path.is_file():
-        logger.error(f"Path `{path}` does not exist")
-        return 1
-
     try:
         # Create engine
         engine = Engine(path)
