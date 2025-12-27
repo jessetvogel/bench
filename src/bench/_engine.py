@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from bench import Bench
-from bench.cache import Cache
-from bench.logging import get_logger
-from bench.process import Process
+from bench._cache import Cache
+from bench._logging import get_logger
+from bench._process import Process
+from bench._utils import to_hash
 from bench.serialization import check_serializable
 from bench.templates import BenchError, Method, Result, Run, Task, Token
-from bench.utils import hash_serializable
 
 
 class Engine:
@@ -79,8 +79,8 @@ class Engine:
         self.cache.insert_method(method)
 
         # Create new run(s) with status "pending"
-        task_id = hash_serializable(task)
-        method_id = hash_serializable(method)
+        task_id = to_hash(task)
+        method_id = to_hash(method)
 
         # Execute the run as a separate process
         process = Process(["bench-run", str(self._path), task_id, method_id, "-n", str(num_runs)])
@@ -111,8 +111,8 @@ class Engine:
         # Create run from result
         run = Run(
             id=secrets.token_hex(8),
-            task_id=hash_serializable(task),
-            method_id=hash_serializable(method),
+            task_id=to_hash(task),
+            method_id=to_hash(method),
             result=result,
         )
         # Store run

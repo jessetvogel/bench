@@ -2,9 +2,9 @@ import argparse
 from pathlib import Path
 from typing import cast
 
+from bench._engine import Engine
+from bench._logging import get_logger
 from bench.dashboard import Dashboard
-from bench.engine import Engine
-from bench.logging import get_logger
 
 
 def main_dashboard() -> int:

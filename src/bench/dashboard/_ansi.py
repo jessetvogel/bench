@@ -2,8 +2,8 @@ import re
 from typing import Any
 
 _ANSI2HTML_STYLES: dict[str, Any] = {}
-ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\d+)*)?([cnRhlABCDfsurgKJipm]))")
-ANSI2HTML_PALETTE = [
+_ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\d+)*)?([cnRhlABCDfsurgKJipm]))")
+_ANSI2HTML_PALETTE = [
     "var(--text-muted)",
     "var(--red)",
     "var(--green)",
@@ -27,7 +27,7 @@ def _ansi2html_get_style():
     if "style" in _ANSI2HTML_STYLES:
         return _ANSI2HTML_STYLES["style"]
 
-    p = ANSI2HTML_PALETTE
+    p = _ANSI2HTML_PALETTE
 
     regular_style = {
         "1": "",  # bold
@@ -128,7 +128,7 @@ def ansi2html(text: str) -> str:
 
     stack: list[Any] = []
     regular_style, bold_style, indexed_style = _ansi2html_get_style()
-    sub = ANSI_PATTERN.sub(_ansi2html, text)
+    sub = _ANSI_PATTERN.sub(_ansi2html, text)
     while stack:
         sub += "</span>"
         stack.pop()

@@ -7,8 +7,8 @@ from slash.layout import Row
 from slash.reactive import Effect, Signal
 
 import bench
+from bench._engine import Engine
 from bench.dashboard.components import Menu, PageNewTask
-from bench.engine import Engine
 
 PATH_ASSETS = Path(bench.__file__).resolve().parent / "assets"
 

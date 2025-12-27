@@ -17,10 +17,10 @@ from slash.html import H3, HTML, Button, Code, Details, Dialog, Div, Input, Opti
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
-from bench.dashboard.ansi import ansi2html
+from bench._engine import Engine, Execution
+from bench._logging import get_logger
+from bench.dashboard._ansi import ansi2html
 from bench.dashboard.utils import RunGroup, Timer, get_color, timedelta_to_str
-from bench.engine import Engine, Execution
-from bench.logging import get_logger
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Run, Task
 

@@ -4,10 +4,10 @@ import sqlite3
 from pathlib import Path
 
 from bench import Bench
-from bench.logging import RESET, WHITE, get_logger
+from bench._logging import RESET, WHITE, get_logger
+from bench._utils import to_hash
 from bench.serialization import from_json, to_json
 from bench.templates import BenchError, Method, Result, Run, Task, Token
-from bench.utils import hash_serializable
 
 BENCH_CACHE = ".bench_cache"
 GITIGNORE = ".gitignore"
@@ -71,7 +71,7 @@ class Cache:
 
     def insert_task(self, task: Task) -> None:
         """Insert task into database, if not already."""
-        task_id = hash_serializable(task)
+        task_id = to_hash(task)
         self._tasks[task_id] = task
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `tasks` WHERE `id` = ? LIMIT 1", (task_id,))
@@ -84,7 +84,7 @@ class Cache:
 
     def insert_method(self, method: Method) -> None:
         """Insert method into database, if not already."""
-        method_id = hash_serializable(method)
+        method_id = to_hash(method)
         self._methods[method_id] = method
         cursor = self._db.cursor()
         cursor.execute("SELECT 1 FROM `methods` WHERE `id` = ? LIMIT 1", (method_id,))
@@ -220,7 +220,7 @@ class Cache:
 
         For each run that cannot be deserialized properly, an error is logged.
         """
-        task_id = hash_serializable(task)
+        task_id = to_hash(task)
         runs: list[Run] = []
         cursor = self._db.cursor()
         cursor.execute("SELECT `id`, `method`, `status`, `type`, `result` FROM `runs` WHERE `task` = ?", (task_id,))

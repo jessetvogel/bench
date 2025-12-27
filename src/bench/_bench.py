@@ -2,7 +2,7 @@ import inspect
 from collections.abc import Callable, Iterable
 from typing import get_type_hints
 
-from bench.logging import get_logger
+from bench._logging import get_logger
 from bench.templates import Method, Result, Task, Token
 
 _LOGGER = get_logger("bench")

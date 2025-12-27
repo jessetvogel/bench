@@ -6,7 +6,7 @@ from datetime import timedelta
 from types import UnionType
 from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_args, get_origin, get_type_hints
 
-from bench.logging import get_logger
+from bench._logging import get_logger
 
 PlainData: TypeAlias = str | int | float | bool | None | list["PlainData"] | dict[str, "PlainData"]
 

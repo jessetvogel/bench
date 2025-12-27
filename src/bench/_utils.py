@@ -4,7 +4,7 @@ import json
 from bench.templates import Method, Task
 
 
-def hash_serializable(object: Task | Method) -> str:
+def to_hash(object: Task | Method) -> str:
     if not hasattr(object, "_hash"):
         m = hashlib.sha256()
         m.update(object.type_label().encode())
