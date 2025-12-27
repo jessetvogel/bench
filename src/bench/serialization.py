@@ -230,8 +230,10 @@ class DefaultSerializable(Serializable):
             if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
                 msg = f"Cannot decode variable-length parameter '{param.name}'"
                 raise DecodingError(msg)
-            # Data should contain parameter name as key
+            # Data should contain parameter name as key (only if parameter has no default value)
             if param.name not in data:
+                if param.default is not param.empty:
+                    continue
                 msg = f"Missing key '{param.name}', as expected by `{cls.__name__}.__init__`"
                 raise ValueError(msg)
             # Get type hint for parameter

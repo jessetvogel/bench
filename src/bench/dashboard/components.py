@@ -51,6 +51,7 @@ class Menu(Column):
         self._setup()
 
     def _setup(self) -> None:
+        # Style
         self.style(
             {
                 "width": "224px",
@@ -64,7 +65,6 @@ class Menu(Column):
                 "border": "1px solid var(--border-muted)",
             }
         )
-
         # Tasks
         self.append(
             self._header("Tasks", mini_button("+").onclick(lambda: self._content.set(PageNewTask(self._engine)))).style(
@@ -72,25 +72,11 @@ class Menu(Column):
             )
         )
         for task in self._engine.cache.select_tasks():
-
-            def handle_click(event: ClickEvent, task: Task) -> None:
-                self._click_task(task)
-
-            self.append(self._item(task.label(), onclick=partial(handle_click, task=task)))
-
-        # --------
-        # self.append(self._separator())
-
-        # Info
-        # self.append(self._header("Info"))
-        # self.append(self._item("About"))
-
+            self.append(self._item(task.label(), onclick=lambda _, t=task: self._click_task(t)))
         # Processes
         self.append(self._processes())
-
         # Theme
         self.append(self._theme_buttons())
-
         # Timer
         self.append(Timer(self._refresh, seconds=1.0, repeat=True))
 
@@ -103,12 +89,11 @@ class Menu(Column):
                 "height": "40px",
                 "line-height": "40px",
                 "padding": "0px 8px",
-                # "color": "var(--text-muted)",
                 "font-weight": "bold",
             }
         )
 
-    def _item(self, *children: Children, onclick: Callable[[], Awaitable[Any] | Any] | None = None) -> Elem:
+    def _item(self, *children: Children, onclick: Callable[..., Awaitable[Any] | Any] | None = None) -> Elem:
         item = Div(*children).style(
             {
                 "display": "flex",
@@ -124,13 +109,7 @@ class Menu(Column):
         return item
 
     def _separator(self) -> Elem:
-        return Div().style(
-            {
-                "height": "0px",
-                "border-bottom": "1px solid var(--border)",
-                "margin": "8px",
-            }
-        )
+        return Div().style({"height": "0px", "border-bottom": "1px solid var(--border)", "margin": "8px"})
 
     def _theme_buttons(self) -> Elem:
         return Row(
@@ -258,7 +237,7 @@ class DialogNewTask(Dialog):
     def _setup(self) -> None:
         self.append(
             H3(f"Create task of type {self._task_type.type_label()}"),
-            form := Form(self._task_type.params()),
+            form := Form(self._task_type.type_params()),
             Row(
                 Button("Create").onclick(self._handle_click_create),
                 Button("Cancel").onclick(lambda: self.close()),
@@ -268,7 +247,7 @@ class DialogNewTask(Dialog):
 
     def _handle_click_create(self) -> None:
         self.close()
-        task_kwargs = {param.name: self._form.value(param) for param in self._task_type.params()}
+        task_kwargs = {param.name: self._form.value(param) for param in self._task_type.type_params()}
         try:
             self._engine.create_task(self._task_type, **task_kwargs)
         except Exception:
@@ -455,7 +434,7 @@ class PageTask(Div):
                 method = self._engine.cache.select_method(method_id)
                 method_label = method.label()
                 method_params_description = ", ".join(
-                    [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.params()]
+                    [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.type_params()]
                 )
             except Exception as err:
                 Session.require().log(
@@ -618,7 +597,7 @@ class GraphElem(Panel):
         self.append(self._axes)
 
         # "Show average" and "Show standard deviation"
-        if self._graph.option_mean_std:
+        if self._graph.show_avg_std:
             # Create checkbox
             def on_click_checkbox_avg() -> None:
                 self._checkbox_std.set_disabled(not self._checkbox_avg.checked)
@@ -637,7 +616,7 @@ class GraphElem(Panel):
         # Plot each run in each group
         for group in groups:
             # Case "[ ] Show average" is checked
-            if self._graph.option_mean_std and self._checkbox_avg.checked:
+            if self._graph.show_avg_std and self._checkbox_avg.checked:
                 for plot in self._create_avg_std_graphs(group.runs_done, group.color):
                     self._axes.add_plot(plot)
             # Case "[ ] Show average" is not checked
@@ -751,7 +730,7 @@ class DialogNewRun(Dialog):
         self._button_start = button_start
 
     def _handle_change_method(self) -> None:
-        method_params = self._method_types[self._select_method.value].params()
+        method_params = self._method_types[self._select_method.value].type_params()
         self._form_wrapper.clear()
         if method_params:
             self._form_wrapper.append(
@@ -764,7 +743,7 @@ class DialogNewRun(Dialog):
     def _handle_click_start(self) -> None:
         self.close()
         method_type = self._method_types[self._select_method.value]
-        method_kwargs = {param.name: self._form.value(param) for param in method_type.params()}
+        method_kwargs = {param.name: self._form.value(param) for param in method_type.type_params()}
         num_runs = int(self._input_num_runs.value)
         try:
             method = self._engine.create_method(method_type, **method_kwargs)

@@ -1,4 +1,6 @@
+import inspect
 from collections.abc import Callable, Iterable
+from typing import get_type_hints
 
 from bench.logging import get_logger
 from bench.templates import Method, Result, Task, Token
@@ -114,8 +116,8 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool
     """Check if `user_type` is a valid task, method or result type."""
     # Check if derives from `cls`
     if not issubclass(user_type, cls):
-        _LOGGER.warning(
-            "Class '%s' must derive from `%s.%s` to be used as %s type",
+        _LOGGER.error(
+            "Class `%s` must derive from `%s.%s` to be used as %s type",
             user_type.__name__,
             cls.__module__,
             cls.__name__,
@@ -125,10 +127,66 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool
     # Check if abstract methods are implemented
     user_type_abstract_methods = user_type.__abstractmethods__  # type: ignore[attr-defined]
     if user_type_abstract_methods:
-        _LOGGER.warning(
-            "Class '%s' must implement the following methods before it can be used: %s",
+        _LOGGER.error(
+            "Class `%s` must implement the following methods before it can be used: %s",
             user_type.__name__,
             ", ".join([f"'{f}'" for f in user_type_abstract_methods]),
         )
         return False
+    # Check if `type_params` is compatible with `type_constructor`
+    if issubclass(user_type, (Task, Method)):
+        type_params = user_type.type_params()
+        constructor = user_type.type_constructor()
+        signature = inspect.signature(constructor)
+        cons_params = [param for param in signature.parameters.values() if param.name != "self"]
+        cons_type_hints = get_type_hints(constructor)
+        has_cons_param_var_keyword = any(cons_param.kind == cons_param.VAR_KEYWORD for cons_param in cons_params)
+        for cons_param in cons_params:
+            if cons_param.kind == cons_param.VAR_KEYWORD:
+                continue
+            # Variable-length positional parameters are not allowed
+            if cons_param.kind == cons_param.VAR_POSITIONAL:
+                _LOGGER.error(
+                    "Class `%s` has variable-length positional parameter '%s' in constructor `%s`, "
+                    "which is not allowed",
+                    user_type.__name__,
+                    cons_param.name,
+                    constructor.__qualname__,
+                )
+                return False
+            # Constructor parameter should appear in `type_params`
+            type_param = next((type_param for type_param in type_params if type_param.name == cons_param.name), None)
+            if type_param is None:
+                _LOGGER.error(
+                    "Missing parameter '%s' in `%s.type_params()`, as expected by constructor `%s`",
+                    cons_param.name,
+                    user_type.__name__,
+                    constructor.__qualname__,
+                )
+                return False
+            # Type hint for constructor parameter should match type of `type_param`
+            if (
+                type_hint := cons_type_hints.get(cons_param.name, None)
+            ) is not None and type_hint is not type_param.type:
+                _LOGGER.warning(
+                    "Parameter '%s' as provided by `%s.type_params()` has type `%s`, "
+                    "while type hint in constructor `%s` is `%s`",
+                    cons_param.name,
+                    user_type.__name__,
+                    type_param.type.__name__,
+                    constructor.__qualname__,
+                    type_hint.__name__,
+                )
+        # Type parameters should appear in `cons_params` (if no variable-length keyword parameter)
+        for type_param in type_params:
+            if not has_cons_param_var_keyword and not any(
+                cons_param.name == type_param.name for cons_param in cons_params
+            ):
+                _LOGGER.error(
+                    "Parameter '%s' in `%s.type_params()` does not match any parameter of constructor `%s`",
+                    type_param.name,
+                    user_type.__name__,
+                    constructor.__qualname__,
+                )
+                return False
     return True

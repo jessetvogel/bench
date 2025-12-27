@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from collections.abc import Collection
+from collections.abc import Callable, Collection
 from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from bench.serialization import PlainData, Serializable
@@ -71,11 +71,11 @@ class Param(Generic[T]):
         return self._max
 
 
-def _params_default(cls) -> list[Param]:
+def _params_default(constructor: Callable[..., Any]) -> list[Param]:
     """Default implementation of `.params()` of `Task` and `Method` using type hints."""
     params: list[Param] = []
-    signature = inspect.signature(cls.__init__)
-    type_hints = get_type_hints(cls.__init__)
+    signature = inspect.signature(constructor)
+    type_hints = get_type_hints(constructor)
     for name, param in signature.parameters.items():
         if name == "self":
             continue
@@ -115,9 +115,17 @@ class Task(ABC, Serializable):
         return ""
 
     @classmethod
-    def params(cls) -> list[Param]:
-        """Parameters to instantiate this task."""
-        return _params_default(cls)
+    def type_constructor(cls) -> Callable[..., Self]:
+        """Constructor for the class of tasks."""
+        return cls
+
+    @classmethod
+    def type_params(cls) -> list[Param]:
+        """Parameters to instantiate this task.
+
+        The result of this function should be compatible with :py:meth:`type_constructor`.
+        """
+        return _params_default(cls.type_constructor())
 
     def label(self) -> str:
         """Display name of the task."""
@@ -153,9 +161,19 @@ class Method(ABC, Serializable):
         return cls.__name__
 
     @classmethod
-    def params(cls) -> list[Param]:
-        """Parameters to instantiate this method."""
-        return _params_default(cls)
+    def type_constructor(cls) -> Callable[..., Self]:
+        """Constructor for the class of methods."""
+        return cls
+
+    @classmethod
+    def type_params(cls) -> list[Param]:
+        """Parameters to instantiate this method.
+
+        The result of this function should be compatible with :py:meth:`type_constructor`.
+        """
+        if (constructor := cls.type_constructor()) is cls:
+            return _params_default(cls.__init__)
+        return _params_default(constructor)
 
     def label(self) -> str:
         """Display name of the method."""

@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 from bench import Bench
-from bench.logging import get_logger
+from bench.logging import RESET, WHITE, get_logger
 from bench.serialization import from_json, to_json
 from bench.templates import BenchError, Method, Result, Run, Task, Token
 from bench.utils import hash_serializable
@@ -187,9 +187,12 @@ class Cache:
             try:
                 task = self._parse_task(task_type_name, task_blob)
                 tasks.append(task)
-            except Exception as err:
-                msg = f"Failed to deserialize task of type '{task_type_name}' ({err}):\n\n{task_blob.decode()}"
-                self._logger.error(msg)
+            except Exception:
+                msg = (
+                    f"Failed to deserialize task of type '{task_type_name}':\n"  # .
+                    f"{WHITE}{task_blob.decode()}{RESET}"
+                )
+                self._logger.exception(msg)
         return tasks
 
     def select_methods(self) -> list[Method]:

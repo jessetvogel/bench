@@ -51,7 +51,7 @@ class Engine:
 
         Note: May raise an exception.
         """
-        task = task_type(**kwargs)
+        task = task_type.type_constructor()(**kwargs)
         check_serializable(task)
         self.cache.insert_task(task)
         return task
@@ -61,7 +61,7 @@ class Engine:
 
         Note: May raise an exception.
         """
-        method = method_type(**kwargs)
+        method = method_type.type_constructor()(**kwargs)
         check_serializable(method)
         self.cache.insert_method(method)
         return method

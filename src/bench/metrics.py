@@ -26,4 +26,4 @@ class Graph(Metric):
     title: str | None = None
     xlabel: str | None = None
     ylabel: str | None = None
-    option_mean_std: bool = False
+    show_avg_std: bool = False

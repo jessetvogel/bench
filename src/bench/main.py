@@ -1,5 +1,4 @@
 import argparse
-import sys
 from pathlib import Path
 from typing import cast
 
@@ -8,7 +7,7 @@ from bench.engine import Engine
 from bench.logging import get_logger
 
 
-def main_dashboard() -> None:
+def main_dashboard() -> int:
     # logger = get_logger("bench")
 
     # Parse arguments
@@ -28,9 +27,10 @@ def main_dashboard() -> None:
     # except Exception as err:
     # logger.error(f"({type(err).__name__}) {err}")
     # sys.exit(1)
+    return 0
 
 
-def main_run() -> None:
+def main_run() -> int:
     logger = get_logger("bench")
 
     # Parse arguments
@@ -54,11 +54,11 @@ def main_run() -> None:
     # Validate input
     if num_runs <= 0:
         logger.error("Number of runs must be a positive integer")
-        return
+        return 1
 
     if not path.is_file():
         logger.error(f"Path `{path}` does not exist")
-        return
+        return 1
 
     try:
         # Create engine
@@ -68,7 +68,7 @@ def main_run() -> None:
         method = engine.cache.select_method(method_id)
     except Exception as err:
         logger.error(str(err))
-        return
+        return 1
 
     # Execute runs
     for it in range(num_runs):
@@ -76,8 +76,8 @@ def main_run() -> None:
         run = engine.execute_run(task, method)
         # If run failed, stop
         if run.status == "failed":
-            sys.exit(1)
-            return
+            return 1
 
     # Done
     logger.info("Done!")
+    return 0
