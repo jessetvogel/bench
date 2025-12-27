@@ -8,7 +8,7 @@ from bench.dashboard import Dashboard
 
 
 def main_dashboard() -> int:
-    # logger = get_logger("bench")
+    logger = get_logger("bench")
 
     # Parse arguments
     parser = argparse.ArgumentParser(
@@ -19,14 +19,15 @@ def main_dashboard() -> int:
     args = parser.parse_args()
     path = Path(cast(str, args.path))
 
-    # try:
-    # Create engine
-    engine = Engine(path)
-    # Start dashboard
-    Dashboard(engine).run()
-    # except Exception as err:
-    # logger.error(f"({type(err).__name__}) {err}")
-    # sys.exit(1)
+    try:
+        # Create engine
+        engine = Engine(path)
+        # Start dashboard
+        Dashboard(engine).run()
+    except Exception as err:
+        logger.error(str(err))
+        return 1
+
     return 0
 
 
@@ -53,7 +54,7 @@ def main_run() -> int:
 
     # Validate input
     if num_runs <= 0:
-        logger.error("Number of runs must be a positive integer")
+        logger.error("Number of runs must be a positive integer, got %d", num_runs)
         return 1
 
     if not path.is_file():
