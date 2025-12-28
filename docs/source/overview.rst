@@ -11,7 +11,7 @@ One can define a new type of task by creating a Python class that derives from :
 Similarly, a new class of methods is created as a Python class deriving from the :py:class:`~bench.templates.Method` class.
 These classes can then be added to a :py:class:`Bench` instance using the :py:meth:`~bench.Bench.add_task_types` and :py:meth:`~bench.Bench.add_method_types` methods.
 
-Next, the :py:meth:`~bench.Bench.on_run` method is used to set a callback function that executes a given task with a given method.
+Next, the :py:meth:`~bench.Bench.set_run` method is used to set a callback function that executes a given task with a given method.
 Such a callback function should return a :py:class:`~bench.templates.Result` instance (or an instance of a user-defined result type that was added using :py:meth:`~bench.Bench.add_result_types`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
 How the raw results are converted into insightful metrics is determined by the :py:meth:`~bench.templates.Task.analyze` method of the particular :py:class:`~bench.templates.Task` instance.
 
@@ -34,7 +34,7 @@ Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Imp
     bench.add_method_types(MyMethod)
 
     # Function for how to execute task using method
-    @bench.on_run
+    @bench.set_run
     def run(task: MyTask, method: MyMethod) -> Result:
         # < your logic >
         return Result(...)

@@ -134,7 +134,7 @@ Create a file ``root_finding.py`` with the following contents.
     bench.add_method_types(RandomSolver, NewtonSolver)
 
     # Define a callback method for executing a task with a method
-    @bench.on_run
+    @bench.set_run
     def run(task: Task, method: Method) -> Result:
         assert isinstance(task, Cubic)
         assert isinstance(method, RandomSolver | NewtonSolver)

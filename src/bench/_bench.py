@@ -56,7 +56,7 @@ class Bench:
             if _check_user_type(Result, result_type):
                 self._result_types.extend(types)
 
-    def on_run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
+    def set_run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
         """Set handler for executing tasks with a method.
 
         Args:
@@ -69,7 +69,7 @@ class Bench:
         self._handler_run = handler
 
     def run(self, task: Task, method: Method) -> Result | Token:
-        """Execute the task with the method using the user-defined run handler set by :py:meth:`on_run`.
+        """Execute the task with the method using the user-defined run handler set by :py:meth:`set_run`.
 
         Args:
             task: Task to perform.
@@ -80,11 +80,11 @@ class Bench:
             instance to obtain the result at a later time using :py:meth:`poll`.
         """
         if self._handler_run is None:
-            msg = "No run handler was registered. Use the `on_run` method to register a handler."
+            msg = "No run handler was registered. Use the `set_run` method to register a handler."
             raise RuntimeError(msg)
         return self._handler_run(task, method)
 
-    def on_poll(self, handler: Callable[[Token], Result | None]) -> None:
+    def set_poll(self, handler: Callable[[Token], Result | None]) -> None:
         """Set handler for polling a result.
 
         Args:

@@ -44,7 +44,7 @@ bench.add_method_types(MyMethod)
 bench.add_result_types(MyResult)
 
 # Define method for how to execute task using method
-@bench.on_run
+@bench.set_run
 def run(task: MyTask, method: MyMethod) -> MyResult:
     # < your logic >
     return MyResult(...)

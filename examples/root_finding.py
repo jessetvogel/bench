@@ -123,7 +123,7 @@ bench.add_task_types(Cubic)
 bench.add_method_types(RandomSolver, NewtonSolver)
 
 
-@bench.on_run
+@bench.set_run
 def run(task: Task, method: Method) -> Result:
     assert isinstance(task, Cubic)
     assert isinstance(method, RandomSolver | NewtonSolver)
