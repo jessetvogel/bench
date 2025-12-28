@@ -1,66 +1,47 @@
-import fcntl
-import os
-import pty
-import select
+import secrets
 import subprocess
+from pathlib import Path
+
+BENCH_CACHE_TMP = Path(".bench_cache/tmp")
 
 
 class Process:
     def __init__(self, args: list[str]) -> None:
-        # Create pseudo-terminal in which to run the process
-        master_fd, slave_fd = pty.openpty()
-        self._master_fd = master_fd
-
-        # Start process, routing stdout/stderr to `slave_fd`
+        # Open subprocess and write stdout/stderr to a temporary file
+        self._path = _tmp_path()
+        self._file = self._path.open("w")
         self._process = subprocess.Popen(
             args,
-            stdout=slave_fd,
-            stderr=slave_fd,
+            stdout=self._file,
+            stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-
-        # Parent process no longer needs `slave_fd`
-        os.close(slave_fd)
-
-        # Make `master_fd` non-blocking
-        flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
-        fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-
-        # Keep track of `stdout` and `stderr`
+        # Keep track of status and stdout
+        self._status: int | None = None
         self._stdout = ""
-        self._stderr = ""
 
     @property
     def stdout(self) -> str:
-        """Current stdout output."""
         return self._stdout
 
-    @property
-    def stderr(self) -> str:
-        """Current stderr output."""
-        return self._stderr
-
     def poll(self) -> int | None:
-        # Get status of the process
-        status = self._process.poll()
-
-        # If process is still running, only read if `select` says there is data
-        if status is None:
-            ready, _, _ = select.select([self._master_fd], [], [], 0.0)
-            if self._master_fd not in ready:
-                return status
-
-        # Read data
-        try:
-            while True:
-                chunk = os.read(self._master_fd, 4096)
-                if not chunk:
-                    break
-                self._stdout += chunk.decode()
-        except (OSError, BlockingIOError):
-            pass
-
-        return status
+        # If process was already closed, return the status
+        if self._status is not None:
+            return self._status
+        # Update `self._stdout` with contents of the temporary file
+        with self._path.open("r") as file:
+            self._stdout = file.read()
+        # Poll the status of the process
+        self._status = self._process.poll()
+        # If process just closed, also close the temporary file
+        if self._status is not None:
+            self._file.close()
+        return self._status
 
     def kill(self) -> None:
         self._process.kill()
+
+
+def _tmp_path() -> Path:
+    BENCH_CACHE_TMP.mkdir(exist_ok=True)
+    return BENCH_CACHE_TMP / f"{secrets.token_hex(8)}.txt"
