@@ -33,8 +33,8 @@ class Bench:
             types: Task types to add.
         """
         for task_type in types:
-            if _check_user_type(Task, task_type):
-                self._task_types.extend(types)
+            _check_user_type(Task, task_type)
+        self._task_types.extend(types)
 
     def add_method_types(self, *types: type[Method]) -> None:
         """Add user-defined method types to the benchmark.
@@ -43,8 +43,8 @@ class Bench:
             types: Method types to add.
         """
         for method_type in types:
-            if _check_user_type(Method, method_type):
-                self._method_types.extend(types)
+            _check_user_type(Method, method_type)
+        self._method_types.extend(types)
 
     def add_result_types(self, *types: type[Result]) -> None:
         """Add user-defined result types to the benchmark.
@@ -53,8 +53,8 @@ class Bench:
             types: Result types to add.
         """
         for result_type in types:
-            if _check_user_type(Result, result_type):
-                self._result_types.extend(types)
+            _check_user_type(Result, result_type)
+        self._result_types.extend(types)
 
     def set_run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
         """Set handler for executing tasks with a method.
@@ -166,27 +166,21 @@ class Bench:
         raise ValueError(msg)
 
 
-def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool:
+def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None:
     """Check if `user_type` is a valid task, method or result type."""
     # Check if derives from `cls`
     if not issubclass(user_type, cls):
-        _LOGGER.error(
-            "Class `%s` must derive from `%s.%s` to be used as %s type",
-            user_type.__name__,
-            cls.__module__,
-            cls.__name__,
-            cls.__name__.lower(),
+        msg = (
+            f"Class `{user_type.__name__}` must derive from `{cls.__module__}.{cls.__name__}` "
+            f"to be used as {cls.__name__.lower()} type"
         )
-        return False
+        raise ValueError(msg)
     # Check if abstract methods are implemented
     user_type_abstract_methods = user_type.__abstractmethods__  # type: ignore[attr-defined]
     if user_type_abstract_methods:
-        _LOGGER.error(
-            "Class `%s` must implement the following methods before it can be used: %s",
-            user_type.__name__,
-            ", ".join([f"'{f}'" for f in user_type_abstract_methods]),
-        )
-        return False
+        tmp = ", ".join([f"'{f}'" for f in user_type_abstract_methods])
+        msg = f"Class `{user_type.__name__}` must implement the following methods before it can be used: {tmp}"
+        raise ValueError(msg)
     # Check if `type_params` is compatible with `type_constructor`
     if issubclass(user_type, (Task, Method)):
         type_params = user_type.type_params()
@@ -200,24 +194,19 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool
                 continue
             # Variable-length positional parameters are not allowed
             if cons_param.kind == cons_param.VAR_POSITIONAL:
-                _LOGGER.error(
-                    "Class `%s` has variable-length positional parameter '%s' in constructor `%s`, "
-                    "which is not allowed",
-                    user_type.__name__,
-                    cons_param.name,
-                    constructor.__qualname__,
+                msg = (
+                    f"Class `{user_type.__name__}` has variable-length positional parameter '{cons_param.name}' "
+                    f"in constructor `{constructor.__qualname__}`, which is not allowed"
                 )
-                return False
+                raise ValueError(msg)
             # Constructor parameter should appear in `type_params`
             type_param = next((type_param for type_param in type_params if type_param.name == cons_param.name), None)
             if type_param is None:
-                _LOGGER.error(
-                    "Missing parameter '%s' in `%s.type_params()`, as expected by constructor `%s`",
-                    cons_param.name,
-                    user_type.__name__,
-                    constructor.__qualname__,
+                msg = (
+                    f"Missing parameter '{cons_param.name}' in `{user_type.__name__}.type_params()`, "
+                    f"as expected by constructor `{constructor.__qualname__}`"
                 )
-                return False
+                raise ValueError(msg)
             # Type hint for constructor parameter should match type of `type_param`
             if (
                 type_hint := cons_type_hints.get(cons_param.name, None)
@@ -236,11 +225,8 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> bool
             if not has_cons_param_var_keyword and not any(
                 cons_param.name == type_param.name for cons_param in cons_params
             ):
-                _LOGGER.error(
-                    "Parameter '%s' in `%s.type_params()` does not match any parameter of constructor `%s`",
-                    type_param.name,
-                    user_type.__name__,
-                    constructor.__qualname__,
+                msg = (
+                    f"Parameter '{type_param.name}' in `{user_type.__name__}.type_params()` "
+                    f"does not match any parameter of constructor `{constructor.__qualname__}`"
                 )
-                return False
-    return True
+                raise ValueError(msg)
