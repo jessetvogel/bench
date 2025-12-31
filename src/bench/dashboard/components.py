@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Collection
 from datetime import timedelta
 from functools import partial
+from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 import numpy as np
@@ -17,10 +19,11 @@ from slash.html import H3, HTML, Button, Code, Details, Dialog, Div, Input, Opti
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
+from bench._cache import BENCH_CACHE
 from bench._engine import Engine, Execution
 from bench._logging import get_logger
 from bench.dashboard._ansi import ansi2html
-from bench.dashboard.utils import RunGroup, Timer, get_color, timedelta_to_str
+from bench.dashboard.utils import RunGroup, Timer, download_file, get_color, timedelta_to_str
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Run, Task
 
@@ -390,7 +393,13 @@ class PageTask(Div):
         # Metrics
         metrics = self._task.metrics()
         self.append(
-            header_metrics := H3("Metrics"),
+            header_metrics := Row(
+                H3("Metrics"),
+                button_download_metrics := mini_button(
+                    Icon("download").style({"opacity": "0.8", "--icon-size": "20px"})
+                ).onclick(self._download_metrics),
+                Tooltip("Download metrics as JSON", target=button_download_metrics),
+            ).style({"align-items": "center", "gap": "16px"}),
             Div([create_metric_elem(self._engine, metric, self._selected_groups) for metric in metrics]).style(
                 {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
             ),
@@ -494,6 +503,23 @@ class PageTask(Div):
             self._engine.delete_runs(runs)
             self._selected_groups.set([])
             self._refresh_runs()
+
+    def _download_metrics(self) -> None:
+        # Create tmp file (FIXME: clean this up)
+        path = Path(BENCH_CACHE) / "tmp" / f"{self._task.label()}.json"
+        path.parent.mkdir(exist_ok=True, parents=True)
+        # Write data to it
+        with path.open("w") as file:
+            json.dump(
+                {
+                    group.method_id: [self._engine.evaluate_run(run) for run in group.runs_done]
+                    for group in self._selected_groups()
+                },
+                file,
+                default=lambda obj: str(obj),
+            )
+        # Download the file
+        download_file(path)
 
 
 def create_metric_elem(engine: Engine, metric: Metric, selected_groups: Signal[list[RunGroup]]) -> Elem:

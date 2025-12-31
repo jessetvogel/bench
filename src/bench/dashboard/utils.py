@@ -1,6 +1,7 @@
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 
 from slash.core import Elem, Session
 from slash.events import ClickEvent, SupportsOnClick
@@ -93,3 +94,17 @@ COLORS = [
 
 def get_color(index: int) -> str:
     return COLORS[index % len(COLORS)]
+
+
+_JS_DOWNLOAD_FILE = JSFunction(
+    ["name", "url"], """const a=document.createElement("a");a.download=name;a.href=url;a.target="_blank";a.click();"""
+)
+
+
+def download_file(path: Path) -> None:
+    # Share file
+    session = Session.require()
+    url = session.share_file(path)
+    name = path.name
+    # Download file
+    session.execute(_JS_DOWNLOAD_FILE, [name, url])
