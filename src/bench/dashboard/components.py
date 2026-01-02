@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from collections.abc import Collection
 from datetime import timedelta
 from functools import partial
@@ -391,7 +392,6 @@ class PageTask(Div):
         self._column_checkboxes = Column()
         self.append(self._column_checkboxes)
         # Metrics
-        metrics = self._task.metrics()
         self.append(
             header_metrics := Row(
                 H3("Metrics"),
@@ -400,7 +400,12 @@ class PageTask(Div):
                 ).onclick(self._download_metrics),
                 Tooltip("Download metrics as JSON", target=button_download_metrics),
             ).style({"align-items": "center", "gap": "16px"}),
-            Div([create_metric_elem(self._engine, metric, self._selected_groups) for metric in metrics]).style(
+            Div(
+                [
+                    create_metric_elem(self._engine, metric, self._selected_groups)
+                    for metric in self._task.type_metrics()
+                ]
+            ).style(
                 {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
             ),
         )
@@ -508,16 +513,21 @@ class PageTask(Div):
         # Create tmp file (FIXME: clean this up)
         path = Path(BENCH_CACHE) / "tmp" / f"{self._task.label()}.json"
         path.parent.mkdir(exist_ok=True, parents=True)
-        # Write data to it (FIXME: can we guarantee that the metrics are JSON serializable?)
+        # Construct data and write data to file
+        # TODO: add `encode_value(self, value: MV) -> str` method on `Metric` and use that
+        type_metrics = self._task.type_metrics()
+        data = [  # TODO: try-catch
+            {
+                "method": self._engine.cache.select_method(group.method_id).encode(),
+                "runs": [
+                    {metric.name: self._engine.evaluate_metric(metric, run) for metric in type_metrics}
+                    for run in group.runs_done
+                ],
+            }
+            for group in self._selected_groups()
+        ]
         with path.open("w") as file:
-            json.dump(
-                {
-                    group.method_id: [self._engine.evaluate_run(run) for run in group.runs_done]
-                    for group in self._selected_groups()
-                },
-                file,
-                default=str,
-            )
+            json.dump(data, file, default=str)
         # Download the file
         download_file(path)
 
@@ -545,54 +555,54 @@ class TimeElem(Panel):
         Effect(self._setup)
 
     def _setup(self) -> None:
-        keys = self._time.keys
         groups = self._selected_groups()
 
-        self.clear()
-        self.style({"padding": "16px", "display": "none" if len(groups) == 0 else None})
-
-        data = Div().style(
-            {
-                "display": "grid",
-                "grid-template-columns": f"repeat({1 + len(keys)}, max-content)",
-                "grid-gap": "8px 16px",
-                "align-items": "center",
-                "justify-content": "space-around",
-                "justify-items": "center",
-            }
-        )
-        self.append(data)
-
-        data.append(Div(""))
-        for key in keys:
-            data.append(Div(key).style({"font-style": "italic"}))
+        # Compute data
+        keys: list[str] = []
+        data: list[dict[str, str]] = []
 
         for group in groups:
-            timedeltas: dict[str, list[timedelta]] = {key: [] for key in keys}
+            # Gather `timedelta` instances
+            # Also keep track of all the keys encountered
+            timedeltas: dict[str, list[timedelta]] = defaultdict(list)
             for run in group.runs_done:
-                metrics = self._engine.evaluate_run(run)
-                for key in keys:
-                    assert key in metrics, "expected key in metrics"
-                    timedeltas[key].append(metrics[key])
-            averages = {
-                key: timedelta_to_str(sum(ts, start=timedelta(seconds=0)) / len(ts)) if len(ts) > 0 else "-"
-                for key, ts in timedeltas.items()
-            }
-
+                for key, t in self._engine.evaluate_metric(self._time, run).items():  # FIXME: try-catch
+                    timedeltas[key].append(t)
+                    if key not in keys:
+                        keys.append(key)
+            # Compute average `timedelta` and convert to string
             data.append(
-                Row(
-                    Div().style(
-                        {
-                            "background-color": group.color,
-                            "width": "24px",
-                            "height": "24px",
-                            "border-radius": "12px",
-                        }
-                    ),
-                ).style({"align-items": "center", "gap": "8px"})
+                {
+                    key: timedelta_to_str(sum(ts, start=timedelta(seconds=0)) / len(ts)) if len(ts) > 0 else "-"
+                    for key, ts in timedeltas.items()
+                }
             )
+
+        # Fill any absent data
+        for datum in data:
             for key in keys:
-                data.append(Div(averages[key]))
+                if key not in datum:
+                    datum[key] = "-"
+
+        # Create UI
+        self.clear()
+        self.style({"padding": "16px", "display": "none" if len(groups) == 0 else None})
+        self.append(
+            Div()
+            .style(
+                {
+                    "display": "grid",
+                    "grid-template-columns": f"repeat({1 + len(keys)}, max-content)",
+                    "grid-gap": "8px 16px",
+                    "align-items": "center",
+                    "justify-content": "space-around",
+                    "justify-items": "center",
+                }
+            )
+            .append(Div())
+            .append([Div(key).style({"font-style": "italic"}) for key in keys])
+            .append(*[[circle(group.color), *[Div(datum[key]) for key in keys]] for group, datum in zip(groups, data)])
+        )
 
 
 class GraphElem(Panel):
@@ -655,10 +665,7 @@ class GraphElem(Panel):
 
     def _create_graph(self, run: Run, color: str) -> SlashPlot:
         # Evaluate run
-        metrics = self._engine.evaluate_run(run)
-        # Get `xs` and `ys` and create graph
-        xs = metrics[self._graph.key_xs]
-        ys = metrics[self._graph.key_ys]
+        xs, ys = self._engine.evaluate_metric(self._graph, run)  # TODO: try-catch
         return SlashGraph(xs, ys, color=color)
 
     def _create_avg_std_graphs(self, runs: Collection[Run], color: str) -> list[SlashPlot]:
@@ -666,13 +673,13 @@ class GraphElem(Panel):
         if len(runs) == 0:
             return []
         # Evaluate runs
-        metrics_per_run = [self._engine.evaluate_run(run) for run in runs]
+        xys_per_run = [self._engine.evaluate_metric(self._graph, run) for run in runs]
         # Collect the `xs` (should be the same for all runs) and the `ys`
-        xs = metrics_per_run[0][self._graph.key_xs]
+        xs = xys_per_run[0][0]
         yss: list[list[float]] = []
-        for metrics in metrics_per_run:
-            assert metrics[self._graph.key_xs] == xs, "all xs must be the same for avg"
-            yss.append(metrics[self._graph.key_ys])
+        for other_xs, ys in xys_per_run:
+            assert other_xs == xs, "all xs must be the same for avg"
+            yss.append(ys)
         # Create plot of the average of the `ys`
         plots: list[SlashPlot] = []
         np_yss = np.array(yss)
@@ -700,29 +707,23 @@ class TableElem(Div):
     def _setup(self) -> None:
         groups = self._selected_groups()
 
-        self.clear()
-        self.style({"display": "none" if len(groups) == 0 else None})
+        # Compute data
+        keys: list[str] = ["Method"]
+        data: list[dict[str, Any]] = []
 
-        self.append(table := SlashDataTable(["Method"] + list(self._table.keys)))
-        data: list = []
         for group in groups:
             for run in group.runs_done:
-                metrics = self._engine.evaluate_run(run)
-                datum = {
-                    "Method": Div().style(
-                        {
-                            "width": "24px",
-                            "height": "24px",
-                            "border-radius": "100%",
-                            "background-color": group.color,
-                            "margin": "auto",
-                        }
-                    )
-                }
-                for key in self._table.keys:
-                    datum[key] = metrics[key]
+                datum = self._engine.evaluate_metric(self._table, run)
+                datum["Method"] = circle(group.color).style({"margin": "auto"})
+                for key in datum:
+                    if key not in keys:
+                        keys.append(key)
                 data.append(datum)
-        table.set_data(data)
+
+        # Create UI
+        self.clear()
+        self.style({"display": "none" if len(groups) == 0 else None})
+        self.append(SlashDataTable(keys).set_data(data))
 
 
 class DialogNewRun(Dialog):
@@ -852,3 +853,7 @@ def mini_button(*children: Children) -> Button:
             "align-items": "center",
         }
     )
+
+
+def circle(color: str) -> Div:
+    return Div().style({"width": "24px", "height": "24px", "border-radius": "12px", "background-color": color})

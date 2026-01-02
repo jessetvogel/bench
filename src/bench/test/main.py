@@ -9,7 +9,7 @@ from typing import Any, Self, cast
 from bench import Bench
 from bench.metrics import Table, Time
 from bench.serialization import PlainData
-from bench.templates import Method, Metric, Result, Task
+from bench.templates import Method, Result, Task
 
 
 class TaskAdd(Task):
@@ -25,13 +25,15 @@ class TaskAdd(Task):
         assert isinstance(data, dict)
         return cls(cast(int, data["x"]), cast(int, data["y"]))
 
-    @classmethod
-    def metrics(self) -> list[Metric]:
-        return [Time("time"), Table("error")]
-
-    def analyze(self, result: Result) -> dict[str, Any]:
+    @Time()
+    def metric_time(self, result: Result) -> dict[str, timedelta]:
         return {
             "time": timedelta(seconds=cast(float, result["sec"])),
+        }
+
+    @Table()
+    def metric_table(self, result: Result) -> dict[str, Any]:
+        return {
             "error": abs(self.x + self.y - cast(float, result["sum"])),
         }
 
@@ -49,13 +51,15 @@ class TaskProd(Task):
         assert isinstance(data, dict)
         return cls(cast(int, data["u"]), cast(int, data["v"]))
 
-    @classmethod
-    def metrics(self) -> list[Metric]:
-        return [Time("time"), Table("error")]
-
-    def analyze(self, result: Result) -> dict[str, Any]:
+    @Time()
+    def metric_time(self, result: Result) -> dict[str, timedelta]:
         return {
             "time": timedelta(seconds=cast(float, result["sec"])),
+        }
+
+    @Table()
+    def metric_table(self, result: Result) -> dict[str, int | float | str | None]:
+        return {
             "error": abs(self.u * self.v - cast(float, result["prod"])),
         }
 

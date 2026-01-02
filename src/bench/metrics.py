@@ -1,28 +1,23 @@
 from dataclasses import dataclass
+from datetime import timedelta
+from typing import Any
 
 from bench.templates import Metric
 
 
-@dataclass(init=False)
-class Table(Metric):
-    keys: tuple[str, ...]
-
-    def __init__(self, *keys: str) -> None:
-        self.keys = keys
-
-
-@dataclass(init=False)
-class Time(Metric):
-    keys: tuple[str, ...]
-
-    def __init__(self, *keys: str) -> None:
-        self.keys = keys
+@dataclass
+class Table(Metric[dict[str, Any]]):
+    def __init__(self) -> None:
+        pass
 
 
 @dataclass
-class Graph(Metric):
-    key_xs: str
-    key_ys: str
+class Time(Metric[dict[str, timedelta]]):
+    title: str | None = None
+
+
+@dataclass
+class Graph(Metric[tuple[list[float], list[float]]]):
     title: str | None = None
     xlabel: str | None = None
     ylabel: str | None = None

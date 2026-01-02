@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Collection
+from collections.abc import Callable
 from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
 
 from bench.serialization import PlainData, Serializable
@@ -127,6 +127,19 @@ class Task(ABC, Serializable):
         """
         return _params_default(cls.type_constructor())
 
+    @classmethod
+    def type_metrics(cls) -> tuple[Metric[Any]]:
+        """Metrics of the class of tasks.
+
+        The metrics are automatically detected as the methods of the class which are
+        decorated with a `Metric` instance. Do not overwrite this method.
+        """
+        return tuple(
+            metric
+            for attr in cls.__dict__.values()
+            if callable(attr) and (metric := getattr(attr, "_metric", None)) is not None
+        )
+
     def label(self) -> str:
         """Display name of the task."""
         return self.type_label()
@@ -134,15 +147,6 @@ class Task(ABC, Serializable):
     def description(self) -> str:
         """Description of the task."""
         return f"Task instance of type {self.type_label()}"
-
-    @classmethod
-    @abstractmethod
-    def metrics(self) -> Collection[Metric]:
-        """Metrics for the task."""
-
-    @abstractmethod
-    def analyze(self, result: Result) -> dict[str, Any]:
-        """Analyze the result and produce values for the metrics."""
 
     @abstractmethod
     def encode(self) -> PlainData: ...
@@ -293,5 +297,29 @@ class Run:
         raise ValueError(msg)
 
 
-class Metric:
-    pass
+MV = TypeVar("MV")
+MT = TypeVar("MT", bound=Task)
+
+
+class Metric(Generic[MV]):
+    def __call__(self, f: Callable[[MT, Result], MV]) -> Callable[[MT, Result], MV]:
+        if hasattr(self, "_function"):
+            msg = "Can only use once"  # FIXME: better error message
+            raise RuntimeError(msg)
+        self._function = f  # TODO: better variable name
+        setattr(f, "_metric", self)
+        return f
+
+    def evaluate(self, task: Task, result: Result) -> MV:
+        self._check_bound()
+        return self._function(cast(Any, task), result)
+
+    @property
+    def name(self) -> str:
+        self._check_bound()
+        return self._function.__name__
+
+    def _check_bound(self) -> None:
+        if not hasattr(self, "_function"):
+            msg = "Not bound yet"  # FIXME: better error message
+            raise RuntimeError(msg)

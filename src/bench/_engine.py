@@ -5,7 +5,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from bench import Bench
 from bench._cache import Cache
@@ -13,7 +13,7 @@ from bench._logging import get_logger
 from bench._process import Process
 from bench._utils import to_hash
 from bench.serialization import check_serializable
-from bench.templates import BenchError, Method, Result, Run, Task, Token
+from bench.templates import MV, BenchError, Method, Metric, Result, Run, Task, Token
 
 
 class Engine:
@@ -124,15 +124,23 @@ class Engine:
 
         return run
 
-    def evaluate_run(self, run: Run) -> dict[str, Any]:
+    def evaluate_metric(self, metric: Metric[MV], run: Run) -> MV:
+        # Check that run has status 'done'
         if not isinstance(run.result, Result):
             msg = f"Expected run with status 'done', but got {run.status}"
             raise ValueError(msg)
+        # Get task for run
+        task = self.cache.select_task(run.task_id)
+        # Cache metrics in run in private field "_metrics"
         if not hasattr(run, "_metrics"):
-            task = self.cache.select_task(run.task_id)
-            metrics = task.analyze(run.result)
-            setattr(run, "_metrics", metrics)
-        return getattr(run, "_metrics")
+            setattr(run, "_metrics", {})
+        metrics = cast(dict[str, Any], getattr(run, "_metrics"))
+        if metric.name in metrics:
+            return metrics[metric.name]
+        # Evaluate metric with run result
+        metric_value = metric.evaluate(task, run.result)
+        metrics[metric.name] = metric_value
+        return metric_value
 
     def delete_runs(self, runs: Iterable[Run]) -> None:
         self.cache.delete_runs(list(runs))
