@@ -508,7 +508,7 @@ class PageTask(Div):
         # Create tmp file (FIXME: clean this up)
         path = Path(BENCH_CACHE) / "tmp" / f"{self._task.label()}.json"
         path.parent.mkdir(exist_ok=True, parents=True)
-        # Write data to it
+        # Write data to it (FIXME: can we guarantee that the metrics are JSON serializable?)
         with path.open("w") as file:
             json.dump(
                 {
@@ -516,7 +516,7 @@ class PageTask(Div):
                     for group in self._selected_groups()
                 },
                 file,
-                default=lambda obj: str(obj),
+                default=str,
             )
         # Download the file
         download_file(path)

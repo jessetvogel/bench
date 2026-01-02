@@ -6,14 +6,26 @@ from datetime import timedelta
 from types import UnionType
 from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_args, get_origin, get_type_hints
 
-from bench._logging import get_logger
-
 PlainData: TypeAlias = str | int | float | bool | None | list["PlainData"] | dict[str, "PlainData"]
 """Type alias for plain data, that is, JSON-like data such as primitives, lists and string-keyed dictionaries."""
 
 T = TypeVar("T")
 
-_LOGGER = get_logger("bench")
+
+class Serializable(Protocol):
+    """Protocol for serializable objects.
+
+    Serializable classes should implement an :py:meth:`encode` and :py:meth:`decode`
+    method. These methods can be used to encode objects into plain data, and decode
+    plain data into objects.
+    """
+
+    def encode(self) -> PlainData:
+        """Encode object into plain data dictionary."""
+
+    @classmethod
+    def decode(cls, data: PlainData) -> Self:
+        """Decode plain data dictionary into an object."""
 
 
 def default_encode(cls: type[T], object: T) -> PlainData:
@@ -164,87 +176,98 @@ def default_decode(cls: type[T], data: PlainData) -> T:
 
 
 def is_serializable(cls: type) -> bool:
-    return hasattr(cls, "encode") and callable(cls.encode)
+    # FIXME: Check properly
+    return (encode := getattr(cls, "encode", None)) is not None and callable(encode)
 
 
-class Serializable(Protocol):
-    """Protocol for serializable objects.
+def serializable(cls: type[T]) -> type[T]:
+    """Decorator for adding default implementation of the :py:class:`Serializable` protocol.
 
-    Serializable classes should implement an :py:meth:`encode` and :py:meth:`decode`
-    method. These methods can be used to encode objects into plain data, and decode
-    plain data into objects.
+    This decorator adds an :py:meth:`encode` and :py:meth:`decode` to the given class.
+    TODO: Explain what the requirements are for this to work.
+
+    Args:
+        cls: Class to implement default serialization for.
     """
+    # Analyze `cls.__init__`
+    param_types, param_defaults = _analyze_init(cls)
 
     def encode(self) -> PlainData:
-        """Encode object into plain data dictionary."""
-
-    @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        """Decode plain data dictionary into an object."""
-
-
-class DefaultSerializable(Serializable):
-    """Default implementation of serializability.
-
-    This default implementation uses the signature of the :py:const:`__init__` method
-    to determine which properties to encode for serialization, and how to reconstruct
-    the object from it.
-    """
-
-    def encode(self) -> PlainData:
-        # Inspect the signature of the `__init__` method of the class
-        cls = self.__class__
-        signature = inspect.signature(cls.__init__)
-        type_hints = get_type_hints(cls.__init__)
-        params = [param for param in signature.parameters.values() if param.name != "self"]
         # Encode and store the property corresponding to each parameter in a dictionary
         encoded: dict[str, PlainData] = {}
-        for param in params:
-            # Variable-length parameters are not allowed
-            if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
-                msg = f"Cannot encode variable-length parameter '{param.name}'"
-                raise EncodingError(msg)
+        for name, param_type in param_types.items():
             # There should be a property with the same name as the parameter
-            if not hasattr(self, param.name):
-                msg = f"Missing attribute '{param.name}', as expected by `{cls.__name__}.__init__`"
-                raise AttributeError(msg)
-            # Get type hint for parameter
-            if (value_cls := type_hints.get(param.name, None)) is None:
-                msg = f"Missing type hint for parameter '{param.name}' in '{cls.__name__}'.__init__"
+            if not hasattr(self, name):
+                msg = f"Missing attribute '{name}', as expected by `{cls.__name__}.__init__`"
                 raise EncodingError(msg)
             # Encode attribute value
-            value = getattr(self, param.name)
-            encoded[param.name] = default_encode(value_cls, value)
+            value = getattr(self, name)
+            try:
+                encoded[name] = default_encode(param_type, value)
+            except Exception as err:
+                msg = f"Failed to encode property '{name}' of object of type `{self.__class__.__name__}`"
+                raise EncodingError(msg) from err
         return encoded
 
-    @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        assert isinstance(data, dict)
-        # Inspect the signature of the `__init__` method of the class
-        signature = inspect.signature(cls.__init__)
-        type_hints = get_type_hints(cls.__init__)
-        params = [param for param in signature.parameters.values() if param.name != "self"]
-        # Encode and store the property corresponding to each parameter in a dictionary
+    def decode(cls: type[T], data: PlainData) -> T:
+        # Check type of `data`
+        if not isinstance(data, dict):
+            msg = "Expected dictionary"
+            raise DecodingError(msg)
+        # Decode each property and store them in a dictionary
         values: dict[str, Any] = {}
-        for param in params:
-            # Variable-length parameters are not allowed
-            if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
-                msg = f"Cannot decode variable-length parameter '{param.name}'"
-                raise DecodingError(msg)
-            # Data should contain parameter name as key (only if parameter has no default value)
-            if param.name not in data:
-                if param.default is not param.empty:
+        for name, param_type in param_types.items():
+            # Data should contain parameter name as key (if parameter has no default value)
+            if name not in data:
+                if name in param_defaults:
                     continue
-                msg = f"Missing key '{param.name}', as expected by `{cls.__name__}.__init__`"
-                raise ValueError(msg)
-            # Get type hint for parameter
-            if (value_cls := type_hints.get(param.name, None)) is None:
-                msg = f"Missing type hint for parameter '{param.name}' in '{cls.__name__}'.__init__"
-                raise EncodingError(msg)
+                msg = f"Missing key '{name}', as expected by `{cls.__name__}.__init__`"
+                raise DecodingError(msg)
             # Store decoded value
-            values[param.name] = default_decode(value_cls, data[param.name])
+            try:
+                values[name] = default_decode(param_type, data[name])
+            except Exception as err:
+                msg = f"Failed to decode property '{name}' for object of type `{cls.__name__}`"
+                raise DecodingError(msg) from err
         # Construct class instance from values
         return cls(**values)
+
+    # Set encode and decode methods
+    setattr(cls, "encode", encode)
+    setattr(cls, "decode", classmethod(decode))
+
+    return cls
+
+
+def _analyze_init(cls: type[T]) -> tuple[dict[str, type], set[str]]:
+    """Analyze the `__init__` method of `cls` and return the parameter types and parameters with default values."""
+    # Inspect the signature of the `__init__` method of the class
+    signature = inspect.signature(cls.__init__)
+    type_hints = get_type_hints(cls.__init__)
+    params = [param for param in signature.parameters.values() if param.name != "self"]
+    param_types: dict[str, type] = {}
+    param_defaults: set[str] = set()
+    for param in params:
+        # Variable-length parameters are not allowed
+        if param.kind == param.VAR_POSITIONAL or param.kind == param.VAR_KEYWORD:
+            msg = (
+                f"Failed to implement default serialization for class `{cls.__name__}`: "
+                f"variable-length parameter '{param.name}' not allowed in `{cls.__name__}'.__init__`"
+            )
+            raise ValueError(msg)
+        # Store parameter type hints
+        if (param_type := type_hints.get(param.name, None)) is None:
+            msg = (
+                f"Failed to implement default serialization for class `{cls.__name__}`: "
+                f"missing type hint for parameter '{param.name}' in `{cls.__name__}'.__init__`"
+            )
+            raise ValueError(msg)
+        param_types[param.name] = param_type
+        # Store parameters with default value
+        if param.default is not param.empty:
+            param_defaults.add(param.name)
+
+    return param_types, param_defaults
 
 
 class EncodingError(Exception):
