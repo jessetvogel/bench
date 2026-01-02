@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from abc import update_abstractmethods
 from datetime import timedelta
 from types import UnionType
 from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_args, get_origin, get_type_hints
@@ -232,9 +233,10 @@ def serializable(cls: type[T]) -> type[T]:
         # Construct class instance from values
         return cls(**values)
 
-    # Set encode and decode methods
+    # Set encode and decode methods (and update the __abstractmethods__ attribute)
     setattr(cls, "encode", encode)
     setattr(cls, "decode", classmethod(decode))
+    update_abstractmethods(cls)
 
     return cls
 

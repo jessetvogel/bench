@@ -101,10 +101,14 @@ class Engine:
             task: Task to execute.
             method: Method to apply to task.
         """
+        if (run_handler := self._bench.run_handler) is None:
+            msg = "No run handler was registered. Use the `run` method to register a handler."
+            raise RuntimeError(msg)
+
         # Perform task with method
         result: Result | Token | BenchError
         try:
-            result = self._bench.run(task, method)
+            result = run_handler(task, method)
         except Exception as err:
             result = BenchError(str(err))
             self._logger.exception("Run failed due to the following error:")
@@ -132,6 +136,23 @@ class Engine:
 
     def delete_runs(self, runs: Iterable[Run]) -> None:
         self.cache.delete_runs(list(runs))
+
+    def execute_poll(self, token: Token) -> Result | None:
+        if (poll_handler := self._bench.poll_handler) is None:
+            msg = "No poll handler was registered. Use the `Bench.poll` method to register a handler."
+            raise RuntimeError(msg)
+
+        # Perform task with method
+        result: Result | BenchError | None
+        try:
+            result = poll_handler(token)
+        except Exception as err:
+            result = BenchError(str(err))
+            self._logger.exception("Poll failed due to the following error:")
+
+        # TODO: finish this function
+        result = result
+        return None
 
 
 def load_bench(path: Path) -> Bench:

@@ -49,11 +49,11 @@ def test_bench_add_type_that_does_not_derive_from() -> None:
     class A: ...
 
     with pytest.raises(ValueError, match="must derive from"):
-        bench.add_task_types(A)  # type: ignore[arg-type]
+        bench.task(A)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="must derive from"):
-        bench.add_method_types(A)  # type: ignore[arg-type]
+        bench.method(A)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="must derive from"):
-        bench.add_result_types(A)  # type: ignore[arg-type]
+        bench.result(A)  # type: ignore[arg-type]
 
 
 def test_bench_add_type_that_does_not_implement_abstract_methods() -> None:
@@ -65,9 +65,9 @@ def test_bench_add_type_that_does_not_implement_abstract_methods() -> None:
     class M(Method): ...
 
     with pytest.raises(ValueError, match="must implement"):
-        bench.add_task_types(T)  # type: ignore[type-abstract]
+        bench.task(T)  # type: ignore[type-abstract]
     with pytest.raises(ValueError, match="must implement"):
-        bench.add_method_types(M)  # type: ignore[type-abstract]
+        bench.method(M)  # type: ignore[type-abstract]
 
 
 def test_bench_add_types_are_stored() -> None:
@@ -86,9 +86,9 @@ def test_bench_add_types_are_stored() -> None:
 
     class R2(R): ...
 
-    bench.add_task_types(T1, T2)
-    bench.add_method_types(M1, M2)
-    bench.add_result_types(R1, R2)
+    bench.task(T1, T2)
+    bench.method(M1, M2)
+    bench.result(R1, R2)
 
     assert list(bench.task_types) == [T1, T2]
     assert list(bench.method_types) == [M1, M2]

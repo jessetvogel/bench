@@ -104,11 +104,11 @@ class MethodApprox(Method):
 
 bench = Bench("test")
 
-bench.add_task_types(TaskAdd, TaskProd)
-bench.add_method_types(MethodExact, MethodApprox)
+bench.task(TaskAdd, TaskProd)
+bench.method(MethodExact, MethodApprox)
 
 
-@bench.set_run
+@bench.run
 def run(task: Task, method: Method) -> Result:
     assert isinstance(task, (TaskAdd, TaskProd))
     assert isinstance(method, (MethodExact, MethodApprox))

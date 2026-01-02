@@ -256,11 +256,11 @@ class Cache:
         self._db.commit()
 
     def _parse_task(self, task_type_name: str, task_blob: bytes) -> Task:
-        task_type = self._bench.get_task_type(task_type_name)
+        task_type = self._bench.get_task(task_type_name)
         return from_json(task_type, task_blob.decode())
 
     def _parse_method(self, method_type_name: str, method_blob: bytes) -> Method:
-        method_type = self._bench.get_method_type(method_type_name)
+        method_type = self._bench.get_method(method_type_name)
         return from_json(method_type, method_blob.decode())
 
     def _parse_run(
@@ -270,7 +270,7 @@ class Cache:
         if status == "pending":
             result = from_json(Token, result_blob.decode())
         elif status == "done":
-            result_type = self._bench.get_result_type(result_type_name)
+            result_type = self._bench.get_result(result_type_name)
             result = from_json(result_type, result_blob.decode())
         elif status == "failed":
             result = from_json(BenchError, result_blob.decode())

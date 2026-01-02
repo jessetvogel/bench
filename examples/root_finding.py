@@ -119,11 +119,11 @@ bench = Bench("Root finding")
 
 
 # Add the task and method types to the bench
-bench.add_task_types(Cubic)
-bench.add_method_types(RandomSolver, NewtonSolver)
+bench.task(Cubic)
+bench.method(RandomSolver, NewtonSolver)
 
 
-@bench.set_run
+@bench.run
 def run(task: Task, method: Method) -> Result:
     assert isinstance(task, Cubic)
     assert isinstance(method, RandomSolver | NewtonSolver)
