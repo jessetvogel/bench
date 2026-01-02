@@ -10,6 +10,8 @@ Bench is a Python framework for benchmarking.
 
    installation
    overview
+   tasks
+   metrics
 
 .. toctree::
    :maxdepth: 2

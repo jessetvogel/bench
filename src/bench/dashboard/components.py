@@ -633,7 +633,7 @@ class GraphElem(Panel):
         self.append(self._axes)
 
         # "Show average" and "Show standard deviation"
-        if self._graph.show_avg_std:
+        if self._graph.option_avg_std:
             # Create checkbox
             def on_click_checkbox_avg() -> None:
                 self._checkbox_std.set_disabled(not self._checkbox_avg.checked)
@@ -652,7 +652,7 @@ class GraphElem(Panel):
         # Plot each run in each group
         for group in groups:
             # Case "[ ] Show average" is checked
-            if self._graph.show_avg_std and self._checkbox_avg.checked:
+            if self._graph.option_avg_std and self._checkbox_avg.checked:
                 for plot in self._create_avg_std_graphs(group.runs_done, group.color):
                     self._axes.add_plot(plot)
             # Case "[ ] Show average" is not checked

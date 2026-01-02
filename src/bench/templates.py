@@ -302,6 +302,8 @@ MT = TypeVar("MT", bound=Task)
 
 
 class Metric(Generic[MV]):
+    """Base class for a metric."""
+
     def __call__(self, f: Callable[[MT, Result], MV]) -> Callable[[MT, Result], MV]:
         if hasattr(self, "_function"):
             msg = "Can only use once"  # FIXME: better error message
@@ -311,15 +313,15 @@ class Metric(Generic[MV]):
         return f
 
     def evaluate(self, task: Task, result: Result) -> MV:
-        self._check_bound()
+        self._check_is_bound()
         return self._function(cast(Any, task), result)
 
     @property
     def name(self) -> str:
-        self._check_bound()
+        self._check_is_bound()
         return self._function.__name__
 
-    def _check_bound(self) -> None:
+    def _check_is_bound(self) -> None:
         if not hasattr(self, "_function"):
             msg = "Not bound yet"  # FIXME: better error message
             raise RuntimeError(msg)
