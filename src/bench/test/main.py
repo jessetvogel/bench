@@ -11,7 +11,10 @@ from bench.metrics import Table, Time
 from bench.serialization import PlainData
 from bench.templates import Method, Result, Task
 
+bench = Bench("test")
 
+
+@bench.task
 class TaskAdd(Task):
     def __init__(self, x: int, y: int) -> None:
         self.x = x
@@ -38,6 +41,7 @@ class TaskAdd(Task):
         }
 
 
+@bench.task
 class TaskProd(Task):
     def __init__(self, u: int, v: int) -> None:
         self.u = u
@@ -64,6 +68,7 @@ class TaskProd(Task):
         }
 
 
+@bench.method
 class MethodExact(Method):
     def __init__(self) -> None:
         pass
@@ -85,6 +90,7 @@ class MethodExact(Method):
         raise NotImplementedError()
 
 
+@bench.method
 class MethodApprox(Method):
     def __init__(self) -> None:
         pass
@@ -104,12 +110,6 @@ class MethodApprox(Method):
             prod = task.u * task.v + random.uniform(-0.5, +0.5)
             return Result(prod=prod)
         raise NotImplementedError()
-
-
-bench = Bench("test")
-
-bench.task(TaskAdd, TaskProd)
-bench.method(MethodExact, MethodApprox)
 
 
 @bench.run

@@ -33,18 +33,17 @@ First, we must define what a *task* is. In this example, we will consider only o
         def f(self, x: float) -> float:
             return self.a * x**3 + self.b * x**2 + self.c * x + self.d
         
-        # The `metrics` method describes the metrics that can be derived from
-        # the result of a task. The `evaluate` method computes the actual values
-        # for these metrics from a result instance.
-        @classmethod
-        def metrics(self) -> list[Metric]:
-            return [Time("time"), Table("x", "abs(y)", "calls to f(x)")]
+        # The following two methods define metrics that are derived from
+        # the result of a task.
+        @Time()
+        def time(self, result: Result) -> dict[str, timedelta]:
+            return {"time": timedelta(seconds=result["seconds"])}
 
-        def evaluate(self, result: Result) -> dict[str, Any]:
+        @Table()
+        def table(self, result: Result) -> dict[str, Any]:
             x = result["x"]
             y = self.f(x)
             return {
-                "time": timedelta(seconds=result["seconds"]),
                 "x": x,
                 "abs(y)": abs(y),
                 "calls to f(x)": result["num_evals"],
@@ -130,11 +129,12 @@ Create a file ``root_finding.py`` with the following contents.
     bench = Bench("Root finding")
 
     # Add the task types and method types
-    bench.add_task_types(Cubic)
-    bench.add_method_types(RandomSolver, NewtonSolver)
+    bench.task(Cubic)
+    bench.method(RandomSolver)
+    bench.method(NewtonSolver)
 
-    # Define a callback method for executing a task with a method
-    @bench.set_run
+    # Define a callback function for executing a task with a method
+    @bench.run
     def run(task: Task, method: Method) -> Result:
         assert isinstance(task, Cubic)
         assert isinstance(method, RandomSolver | NewtonSolver)

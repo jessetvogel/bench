@@ -167,6 +167,14 @@ dl.py.property>dt.sig.sig-object.py {
     .gp {
         color: var(--light-gray);
     }
+
+    .nd {
+        color: var(--yellow);
+    }
+
+    .nc {
+        color: var(--blue);
+    }
 }
 
 code.docutils.literal.notranslate {

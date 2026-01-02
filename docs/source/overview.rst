@@ -9,11 +9,13 @@ A benchmark consist of various types of *tasks* and various types of *methods* t
 This information, and more, is stored in a :py:class:`Bench` instance, which represents the benchmark.
 One can define a new type of task by creating a Python class that derives from :py:class:`~bench.templates.Task` class.
 Similarly, a new class of methods is created as a Python class deriving from the :py:class:`~bench.templates.Method` class.
-These classes can then be added to a :py:class:`Bench` instance using the :py:meth:`~bench.Bench.add_task_types` and :py:meth:`~bench.Bench.add_method_types` methods.
+These classes can then be added to a :py:class:`Bench` instance using :py:meth:`Bench.task() <bench.Bench.task>` and :py:meth:`Bench.method() <bench.Bench.method>`.
 
-Next, the :py:meth:`~bench.Bench.set_run` method is used to set a callback function that executes a given task with a given method.
-Such a callback function should return a :py:class:`~bench.templates.Result` instance (or an instance of a user-defined result type that was added using :py:meth:`~bench.Bench.add_result_types`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
-How the raw results are converted into insightful metrics is determined by the :py:meth:`~bench.templates.Task.analyze` method of the particular :py:class:`~bench.templates.Task` instance.
+Next, the :py:meth:`Bench.run() <bench.Bench.run>` decorator is used to set a callback function that executes a given task with a given method.
+Such a callback function should return a :py:class:`~bench.templates.Result` instance (or an instance of a user-defined result type that was added using :py:meth:`Bench.result() <bench.Bench.result>`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
+
+Raw results can be converted into insightful metrics by adding methods to the :py:class:`~bench.templates.Task` subclass,
+which are decorated by a :py:class:`~bench.templates.Metric` instance.
 
 >>> # TODO: insert diagram with all concepts related by the relevant functions
 
@@ -24,14 +26,15 @@ Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Imp
 .. code-block:: python
 
     from bench import Bench
-    from bench.templates import Result
-
-    from my_package import MyTask, MyMethod
+    from bench.templates import Task, Method, Result
 
     bench = Bench("My benchmark")
 
-    bench.add_task_types(MyTask)
-    bench.add_method_types(MyMethod)
+    @bench.task
+    class MyTask(Task): ...
+
+    @bench.method
+    class MyMethod(Method): ...
 
     # Function for how to execute task using method
     @bench.set_run

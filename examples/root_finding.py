@@ -8,10 +8,14 @@ from typing import Any, Self
 from bench import Bench
 from bench.metrics import Table, Time
 from bench.serialization import PlainData
-from bench.templates import Method, Metric, Result, Task
+from bench.templates import Method, Result, Task
+
+# Create `Bench` instance
+bench = Bench("Root finding")
 
 
-# Task types
+# Add task type to benchmark
+@bench.task
 class Cubic(Task):
     def __init__(self, a: float, b: float, c: float, d: float) -> None:
         self.a = a
@@ -22,15 +26,17 @@ class Cubic(Task):
     def f(self, x: float) -> float:
         return self.a * x**3 + self.b * x**2 + self.c * x + self.d
 
-    @classmethod
-    def metrics(self) -> list[Metric]:
-        return [Time("time"), Table("x", "abs(y)", "calls to f(x)")]
+    # The following two methods define metrics that are derived from
+    # the result of a task.
+    @Time()
+    def time(self, result: Result) -> dict[str, timedelta]:
+        return {"time": timedelta(seconds=result["seconds"])}
 
-    def analyze(self, result: Result) -> dict[str, Any]:
+    @Table()
+    def table(self, result: Result) -> dict[str, Any]:
         x = result["x"]
         y = self.f(x)
         return {
-            "time": timedelta(seconds=result["seconds"]),
             "x": x,
             "abs(y)": abs(y),
             "calls to f(x)": result["num_evals"],
@@ -56,7 +62,8 @@ class Cubic(Task):
         )
 
 
-# Method types
+# Add method type to benchmark
+@bench.method
 class RandomSolver(Method):
     def __init__(self, x_min: float = -10.0, x_max: float = +10.0) -> None:
         self.x_min = x_min
@@ -85,6 +92,7 @@ class RandomSolver(Method):
         return Result(x=best_x, num_evals=num_evals)
 
 
+@bench.method
 class NewtonSolver(Method):
     def __init__(self, x_0: float = 0.0, eps: float = 0.01) -> None:
         self.x_0 = x_0
@@ -114,19 +122,10 @@ class NewtonSolver(Method):
         return Result(x=x, num_evals=num_evals)
 
 
-# Create `Bench` instance
-bench = Bench("Root finding")
-
-
-# Add the task and method types to the bench
-bench.task(Cubic)
-bench.method(RandomSolver, NewtonSolver)
-
-
 @bench.run
 def run(task: Task, method: Method) -> Result:
     assert isinstance(task, Cubic)
-    assert isinstance(method, RandomSolver | NewtonSolver)
+    assert isinstance(method, (RandomSolver, NewtonSolver))
 
     start_time = time.perf_counter()
     result = method.find_root(task)

@@ -1,11 +1,13 @@
 import inspect
 from collections.abc import Callable, Iterable
-from typing import get_type_hints
+from typing import TypeVar, get_type_hints
 
 from bench._logging import get_logger
 from bench.templates import Method, Result, Task, Token
 
 _LOGGER = get_logger("bench")
+
+T = TypeVar("T", bound=type)
 
 
 class Bench:
@@ -26,35 +28,35 @@ class Bench:
         self._run_handler: Callable[[Task, Method], Result | Token] | None = None
         self._poll_handler: Callable[[Token], Result | None] | None = None
 
-    def task(self, *types: type[Task]) -> None:
-        """Add user-defined task types to the benchmark.
+    def task(self, task_type: T) -> T:
+        """Add user-defined task type to the benchmark.
 
         Args:
-            types: Task types to add.
+            task_type: Task type to add.
         """
-        for task_type in types:
-            _check_user_type(Task, task_type)
-        self._task_types.extend(types)
+        _check_user_type(Task, task_type)
+        self._task_types.append(task_type)
+        return task_type
 
-    def method(self, *types: type[Method]) -> None:
-        """Add user-defined method types to the benchmark.
+    def method(self, method_type: T) -> T:
+        """Add user-defined method type to the benchmark.
 
         Args:
-            types: Method types to add.
+            method_type: Method type to add.
         """
-        for method_type in types:
-            _check_user_type(Method, method_type)
-        self._method_types.extend(types)
+        _check_user_type(Method, method_type)
+        self._method_types.append(method_type)
+        return method_type
 
-    def result(self, *types: type[Result]) -> None:
-        """Add user-defined result types to the benchmark.
+    def result(self, result_type: T) -> T:
+        """Add user-defined result type to the benchmark.
 
         Args:
-            types: Result types to add.
+            result_type: Result type to add.
         """
-        for result_type in types:
-            _check_user_type(Result, result_type)
-        self._result_types.extend(types)
+        _check_user_type(Result, result_type)
+        self._result_types.append(result_type)
+        return result_type
 
     def run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
         """Set handler for executing tasks with a method.

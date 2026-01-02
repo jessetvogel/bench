@@ -74,21 +74,23 @@ def test_bench_add_types_are_stored() -> None:
     """Check that types added to a bench instance are indeed stored."""
     bench = Bench("")
 
+    @bench.task
     class T1(T): ...
 
+    @bench.task
     class T2(T): ...
 
+    @bench.method
     class M1(M): ...
 
+    @bench.method
     class M2(M): ...
 
+    @bench.result
     class R1(R): ...
 
+    @bench.result
     class R2(R): ...
-
-    bench.task(T1, T2)
-    bench.method(M1, M2)
-    bench.result(R1, R2)
 
     assert list(bench.task_types) == [T1, T2]
     assert list(bench.method_types) == [M1, M2]
