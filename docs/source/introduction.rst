@@ -1,5 +1,5 @@
-Overview
-========
+Introduction
+============
 
 The :py:mod:`bench` package provides an easy and fast way to set up a benchmark. It handles the data
 management side of the benchmark, and provides a user-friendly dashboard for running the benchmark and

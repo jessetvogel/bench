@@ -7,7 +7,7 @@ from bench.templates import Metric
 class Table(Metric[dict[str, Any]]):
     """Metric for tabular information.
 
-    Any method which this metric decorates must return a dictionary of type :py:const:`dict[str, Any]`, where
+    Any method decorated by this metric must return a dictionary of type :py:const:`dict[str, Any]`, where
     the keys correspond to the columns of the table, and the values correspond to the cells of the table.
 
     Example
@@ -41,7 +41,7 @@ class Table(Metric[dict[str, Any]]):
 class Time(Metric[dict[str, timedelta]]):
     """Metric for timing information.
 
-    Any method which this metric decorates must return a dictionary of type :py:const:`dict[str, timedelta]`.
+    Any method decorated by this metric must return a dictionary of type :py:const:`dict[str, timedelta]`.
 
     Example
     -------
@@ -74,7 +74,7 @@ class Time(Metric[dict[str, timedelta]]):
 class Graph(Metric[tuple[list[float], list[float]]]):
     """Metric for 2D graphs.
 
-    Any method which this metric decorates must return a tuple of type :py:const:`tuple[list[float], list[float]]`
+    Any method decorated by this metric must return a tuple of type :py:const:`tuple[list[float], list[float]]`
     containing a list of x-coordinates and a list of y-coordinates.
 
     Example

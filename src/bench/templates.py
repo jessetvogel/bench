@@ -165,6 +165,11 @@ class Method(ABC, Serializable):
         return cls.__name__
 
     @classmethod
+    def type_description(cls) -> str:
+        """Description of the class of methods."""
+        return ""
+
+    @classmethod
     def type_constructor(cls) -> Callable[..., Self]:
         """Constructor for the class of methods."""
         return cls
@@ -182,6 +187,10 @@ class Method(ABC, Serializable):
     def label(self) -> str:
         """Display name of the method."""
         return self.type_label()
+
+    def description(self) -> str:
+        """Description of the task."""
+        return f"Method instance of type {self.type_label()}"
 
     @abstractmethod
     def encode(self) -> PlainData: ...
