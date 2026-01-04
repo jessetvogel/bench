@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 import sqlite3
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from bench.templates import BenchError, Method, Result, Run, Task, Token
 
 BENCH_CACHE = ".bench_cache"
 GITIGNORE = ".gitignore"
+TMP = "tmp"
 
 SQL_INIT = [
     "CREATE TABLE `tasks` (`id` TEXT NOT NULL, `type` TEXT NOT NULL, `data` BLOB NOT NULL, PRIMARY KEY (`id`))",
@@ -28,6 +30,7 @@ class Cache:
         self._tasks: dict[str, Task] = {}
         self._methods: dict[str, Method] = {}
         self._runs: dict[str, Run] = {}
+        self._tmp_files: list[Path] = []
         self._setup()
 
     def _setup(self) -> None:
@@ -255,6 +258,8 @@ class Cache:
             cursor.execute(f"DELETE FROM `runs` WHERE `id` IN ({placeholders})", run_ids)
         self._db.commit()
 
+    # PARSING METHODS
+
     def _parse_task(self, task_type_name: str, task_blob: bytes) -> Task:
         task_type = self._bench.get_task(task_type_name)
         return from_json(task_type, task_blob.decode())
@@ -278,3 +283,18 @@ class Cache:
             msg = f"Encountered status '{status}', expected 'pending', 'done' or 'failed'"
             raise RuntimeError(msg)
         return Run(run_id, task_id, method_id, result)
+
+    # OTHER METHODS
+
+    def temporary_file(self) -> Path:
+        (path_tmp := self._path / TMP).mkdir(exist_ok=True)
+        self._tmp_files.append(path_tmp_file := path_tmp / f"{secrets.token_hex(8)}.txt")
+        return path_tmp_file
+
+    def shutdown(self) -> None:
+        # Close connection
+        self._db.close()
+
+        # Remove all temporary files
+        for path in self._tmp_files:
+            path.unlink(missing_ok=True)

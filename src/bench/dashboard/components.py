@@ -21,7 +21,7 @@ from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench._cache import BENCH_CACHE
-from bench._engine import Engine, Execution
+from bench._engine import Engine, ExecutionProcess
 from bench._logging import get_logger
 from bench.dashboard._ansi import ansi2html
 from bench.dashboard.utils import RunGroup, Timer, download_file, get_color, timedelta_to_str
@@ -51,7 +51,7 @@ class Menu(Column):
         super().__init__()
         self._engine = engine
         self._content = content
-        self._executions = Signal(self._engine.executions)
+        self._executions = Signal(self._engine.execution_processes)
         self._setup()
 
     def _setup(self) -> None:
@@ -128,7 +128,7 @@ class Menu(Column):
     def _click_task(self, task: Task) -> None:
         self._content.set(PageTask(self._engine, task))
 
-    def _click_process(self, execution: Execution) -> None:
+    def _click_process(self, execution: ExecutionProcess) -> None:
         self._content.set(PageProcess(self._engine, execution))
 
     def _processes(self) -> Elem:
@@ -149,7 +149,7 @@ class Menu(Column):
                 Effect(lambda: icon.set_icon(self.icon_status(status())))
                 statuses[execution.id] = status
 
-                def handle_click(event: ClickEvent, execution: Execution) -> None:
+                def handle_click(event: ClickEvent, execution: ExecutionProcess) -> None:
                     self._click_process(execution)
 
                 column.append(
@@ -191,7 +191,7 @@ class Menu(Column):
             return "error"
 
     def _refresh(self) -> None:
-        self._executions.set(self._engine.executions)
+        self._executions.set(self._engine.execution_processes)
 
 
 class PageNewTask(Div):
@@ -269,7 +269,7 @@ class DialogNewTask(Dialog):
 class PageProcess(Div):
     """Page element for seeing the progress of a process."""
 
-    def __init__(self, engine: Engine, execution: Execution) -> None:
+    def __init__(self, engine: Engine, execution: ExecutionProcess) -> None:
         super().__init__()
         self._engine = engine
         self._execution = execution
@@ -785,7 +785,7 @@ class DialogNewRun(Dialog):
                 level="error",
             )
             return
-        self._engine.launch_run(self._task, method, num_runs=num_runs)
+        self._engine.execute_run_in_process(self._task, method, num_runs=num_runs)
 
 
 class Form(Div):

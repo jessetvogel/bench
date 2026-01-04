@@ -24,6 +24,8 @@ def main_dashboard() -> int:
         engine = Engine(path)
         # Start dashboard
         Dashboard(engine).run()
+        # Shutdown engine
+        engine.shutdown()
     except Exception as err:
         logger.error(str(err))
         return 1
@@ -74,6 +76,9 @@ def main_run() -> int:
         # If run failed, stop
         if run.status == "failed":
             return 1
+
+    # Shutdown engine
+    engine.shutdown()
 
     # Done
     logger.info("Done!")

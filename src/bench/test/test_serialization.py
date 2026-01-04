@@ -2,22 +2,22 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Literal
 
-from bench.serialization import Serializable, serializable
+from bench.serialization import Serializable, default_serialization
 
 
-@serializable
+@default_serialization
 @dataclass
 class X(Serializable):
     x: int = 42
 
 
-@serializable
+@default_serialization
 @dataclass
 class Y(Serializable):
     y: float = 3.1415
 
 
-@serializable
+@default_serialization
 @dataclass
 class A(Serializable):
     n: None = None

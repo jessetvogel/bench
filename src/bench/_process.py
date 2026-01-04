@@ -1,18 +1,15 @@
-import secrets
 import subprocess
 from pathlib import Path
 
-BENCH_CACHE_TMP = Path(".bench_cache/tmp")
-
 
 class Process:
-    def __init__(self, args: list[str]) -> None:
-        # Open subprocess and write stdout/stderr to a temporary file
-        self._path = _tmp_path()
-        self._file = self._path.open("w")
+    def __init__(self, args: list[str], *, path_stdout: Path) -> None:
+        # Open subprocess and write stdout/stderr to file
+        self._path_stdout = path_stdout
+        self._file_stdout = self._path_stdout.open("w")
         self._process = subprocess.Popen(
             args,
-            stdout=self._file,
+            stdout=self._file_stdout,
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
@@ -29,19 +26,14 @@ class Process:
         if self._status is not None:
             return self._status
         # Update `self._stdout` with contents of the temporary file
-        with self._path.open("r") as file:
+        with self._path_stdout.open("r") as file:
             self._stdout = file.read()
         # Poll the status of the process
         self._status = self._process.poll()
         # If process just closed, also close the temporary file
         if self._status is not None:
-            self._file.close()
+            self._file_stdout.close()
         return self._status
 
     def kill(self) -> None:
         self._process.kill()
-
-
-def _tmp_path() -> Path:
-    BENCH_CACHE_TMP.mkdir(exist_ok=True)
-    return BENCH_CACHE_TMP / f"{secrets.token_hex(8)}.txt"

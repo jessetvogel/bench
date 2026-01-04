@@ -176,19 +176,21 @@ def default_decode(cls: type[T], data: PlainData) -> T:
     raise NotImplementedError(msg)
 
 
-def is_serializable(cls: type) -> bool:
-    # FIXME: Check properly
-    return (encode := getattr(cls, "encode", None)) is not None and callable(encode)
-
-
-def serializable(cls: type[T]) -> type[T]:
+def default_serialization(cls: type[T]) -> type[T]:
     """Decorator for adding default implementation of the :py:class:`Serializable` protocol.
 
     This decorator adds an :py:meth:`encode` and :py:meth:`decode` to the given class.
-    TODO: Explain what the requirements are for this to work.
+    An instance of the class will be encoded as a :py:const:`dict` containing the properties of the instance
+    that are in the :py:const:`__init__` method of the class. Decoding is done by constructing a new instance
+    of the class from these properties.
+
+    To use this decorator, the class is required to have, for each parameter of the :py:const:`__init__` method,
+    a property with the same name as the parameter. An instance of the class must be fully reproducible from these
+    properties. The parameters must be equipped with a type hint, with the corresponding type being serializable
+    as well.
 
     Args:
-        cls: Class to implement default serialization for.
+        cls: Class to implement default :py:meth:`encode` and :py:meth:`decode` methods for.
     """
     # Analyze `cls.__init__`
     param_types, param_defaults = _analyze_init(cls)
@@ -213,7 +215,10 @@ def serializable(cls: type[T]) -> type[T]:
     def decode(cls: type[T], data: PlainData) -> T:
         # Check type of `data`
         if not isinstance(data, dict):
-            msg = "Expected dictionary"
+            msg = (
+                f"Failed to decode into object of type `{cls.__name__}`, "
+                "expected `dict` but got `{type(data).__name__}`"
+            )
             raise DecodingError(msg)
         # Decode each property and store them in a dictionary
         values: dict[str, Any] = {}
@@ -231,7 +236,11 @@ def serializable(cls: type[T]) -> type[T]:
                 msg = f"Failed to decode property '{name}' for object of type `{cls.__name__}`"
                 raise DecodingError(msg) from err
         # Construct class instance from values
-        return cls(**values)
+        try:
+            return cls(**values)
+        except Exception as err:
+            msg = f"Failed to instantiate object of type `{cls.__name__}` from decoded values"
+            raise DecodingError(msg) from err
 
     # Set encode and decode methods (and update the __abstractmethods__ attribute)
     setattr(cls, "encode", encode)
@@ -270,6 +279,15 @@ def _analyze_init(cls: type[T]) -> tuple[dict[str, type], set[str]]:
             param_defaults.add(param.name)
 
     return param_types, param_defaults
+
+
+def is_serializable(cls: type) -> bool:
+    return (
+        (encode := getattr(cls, "encode", None)) is not None
+        and callable(encode)
+        and (decode := getattr(cls, "decode", None)) is not None
+        and callable(decode)
+    )
 
 
 class EncodingError(Exception):

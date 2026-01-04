@@ -27,7 +27,7 @@ class Engine:
         self._path = path
         self._logger = get_logger("bench")
         self._bench = load_bench(path)
-        self._executions: list[Execution] = []
+        self._execution_processes: list[ExecutionProcess] = []
 
     @property
     def bench(self) -> Bench:
@@ -42,9 +42,9 @@ class Engine:
         return self._cache
 
     @property
-    def executions(self) -> Iterable[Execution]:
+    def execution_processes(self) -> Iterable[ExecutionProcess]:
         """Currently running processes."""
-        return tuple(self._executions)
+        return tuple(self._execution_processes)
 
     def create_task(self, task_type: type[Task], **kwargs: int | float | str) -> Task:
         """Create task of given type with given arguments.
@@ -66,7 +66,7 @@ class Engine:
         self.cache.insert_method(method)
         return method
 
-    def launch_run(self, task: Task, method: Method, *, num_runs: int = 1) -> None:
+    def execute_run_in_process(self, task: Task, method: Method, *, num_runs: int = 1) -> None:
         """Launch new process to execute a run based on the given task and method.
 
         Args:
@@ -83,14 +83,17 @@ class Engine:
         method_id = to_hash(method)
 
         # Execute the run as a separate process
-        process = Process(["bench-run", str(self._path), task_id, method_id, "-n", str(num_runs)])
-        self._executions.append(
-            Execution(
+        process = Process(
+            ["bench-run", str(self._path), task_id, method_id, "-n", str(num_runs)],
+            path_stdout=self.cache.temporary_file(),
+        )
+        self._execution_processes.append(
+            ExecutionProcess(
+                process=process,
                 task=task,
                 method=method,
                 num_runs=num_runs,
                 created_at=datetime.now(),
-                process=process,
             )
         )
 
@@ -162,6 +165,9 @@ class Engine:
         result = result
         return None
 
+    def shutdown(self) -> None:
+        self.cache.shutdown()
+
 
 def load_bench(path: Path) -> Bench:
     """Load :py:class:`Bench` instance from the module given by the provided path.
@@ -197,12 +203,12 @@ def load_bench(path: Path) -> Bench:
 
 
 @dataclass
-class Execution:
+class ExecutionProcess:
+    process: Process
     task: Task
     method: Method
     num_runs: int
     created_at: datetime
-    process: Process
 
     @property
     def id(self) -> str:
