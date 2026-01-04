@@ -22,11 +22,11 @@ class Serializable(Protocol):
     """
 
     def encode(self) -> PlainData:
-        """Encode object into plain data dictionary."""
+        """Encode object into plain data."""
 
     @classmethod
     def decode(cls, data: PlainData) -> Self:
-        """Decode plain data dictionary into an object."""
+        """Decode plain data into an object."""
 
 
 def default_encode(cls: type[T], object: T) -> PlainData:
@@ -288,6 +288,17 @@ def is_serializable(cls: type) -> bool:
         and (decode := getattr(cls, "decode", None)) is not None
         and callable(decode)
     )
+
+
+def is_plain_data(data: Any) -> bool:
+    """Check if `data` is of type :py:class:`PlainData`."""
+    if data is None or isinstance(data, (str, int, float)):
+        return True
+    if isinstance(data, list):
+        return all(is_plain_data(x) for x in data)
+    if isinstance(data, dict):
+        return all(isinstance(key, str) and is_plain_data(value) for key, value in data.items())
+    return False
 
 
 class EncodingError(Exception):

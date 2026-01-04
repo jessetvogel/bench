@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import importlib.util
 import secrets
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable, cast
 
 from bench import Bench
 from bench._cache import Cache
+from bench._components import ExecutionProcess, Run
 from bench._logging import get_logger
 from bench._process import Process
 from bench._utils import to_hash
 from bench.serialization import check_serializable
-from bench.templates import MV, Method, Metric, Result, Run, Task, Token
+from bench.templates import MV, Method, Metric, Result, Task, Token
 
 
 class Engine:
@@ -200,16 +200,3 @@ def load_bench(path: Path) -> Bench:
 
     msg = f"Python module '{path}' contains no instance of `Bench`"
     raise ValueError(msg)
-
-
-@dataclass
-class ExecutionProcess:
-    process: Process
-    task: Task
-    method: Method
-    num_runs: int
-    created_at: datetime
-
-    @property
-    def id(self) -> str:
-        return str(self.created_at)

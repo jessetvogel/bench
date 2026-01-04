@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
 
-from bench.serialization import PlainData, Serializable
+from bench.serialization import PlainData, Serializable, is_plain_data
 
 T = TypeVar("T", bound=int | float | str)
 
@@ -19,8 +19,6 @@ class Param(Generic[T]):
         options: List of allowed values of the parameter.
         default: Default value of the parameter.
         description: Description of the parameter.
-        min: Minimum value of the parameter.
-        max: Maximum value of the parameter.
     """
 
     def __init__(
@@ -31,16 +29,12 @@ class Param(Generic[T]):
         options: list[T] | None = None,
         default: T | None = None,
         description: str | None = None,
-        min: int | float | None = None,
-        max: int | float | None = None,
     ) -> None:
         self._name = name
         self._type = type
         self._options = options
         self._default = default
         self._description = description
-        self._min = min
-        self._max = max
 
     @property
     def name(self) -> str:
@@ -61,14 +55,6 @@ class Param(Generic[T]):
     @property
     def description(self) -> str | None:
         return self._description
-
-    @property
-    def min(self) -> int | float | None:
-        return self._min
-
-    @property
-    def max(self) -> int | float | None:
-        return self._max
 
 
 def _params_default(constructor: Callable[..., Any]) -> list[Param]:
@@ -134,7 +120,7 @@ class Task(ABC, Serializable):
         """Metrics of the class of tasks.
 
         The metrics are automatically detected as the methods of the class which are
-        decorated with a `Metric` instance. Do not overwrite this method.
+        decorated with a :py:class:`Metric` instance. *Do not overwrite this method!*
         """
         return tuple(
             metric
@@ -218,16 +204,25 @@ class Result(ABC, Serializable):
 
 
 class PlainResult(Result):
-    """Result class containing arbitrary plain data."""
+    """Implementation of the :py:class:`~bench.templates.Result` class for arbitrary plain data.
+
+    Args:
+        data: Arbitrary plain data.
+    """
 
     def __init__(self, **data: PlainData) -> None:
-        self._data = dict(data)
+        self._data: dict[str, PlainData] = {}
+        for key, value in data.items():
+            self[key] = value
 
-    def __getitem__(self, index: str) -> PlainData:
-        return self._data[index]
+    def __getitem__(self, key: str) -> PlainData:
+        return self._data[key]
 
-    def __setitem__(self, index: str, value: PlainData) -> None:
-        self._data[index] = value
+    def __setitem__(self, key: str, value: PlainData) -> None:
+        if not is_plain_data(value):
+            msg = f"Failed to set property '{key}' of `PlainResult`, value is not plain data"
+            raise ValueError(msg)
+        self._data[key] = value
 
     def encode(self) -> PlainData:
         return dict(self._data)
@@ -254,29 +249,6 @@ class Token(Serializable):
     @classmethod
     def decode(cls, data: PlainData) -> Self:
         return cls(data)
-
-
-class BenchError(Exception, Serializable):
-    """Exception raised for bench errors.
-
-    Args:
-        message: Error message.
-    """
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self._message = message
-
-    @property
-    def message(self) -> str:
-        return self._message
-
-    def encode(self) -> PlainData:
-        return self.message
-
-    @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        return cls(cast(str, data))
 
 
 MT = TypeVar("MT", bound=Task)
@@ -308,41 +280,3 @@ class Metric(Generic[MV]):
         if not hasattr(self, "_function"):
             msg = "Not bound yet"  # FIXME: better error message
             raise RuntimeError(msg)
-
-
-class Run:
-    def __init__(self, id: str, task_id: str, method_id: str, result: Result | Token) -> None:
-        self._id = id
-        self._task_id = task_id
-        self._method_id = method_id
-        self._result = result
-
-    @property
-    def id(self) -> str:
-        return self._id
-
-    @property
-    def task_id(self) -> str:
-        return self._task_id
-
-    @property
-    def method_id(self) -> str:
-        return self._method_id
-
-    @property
-    def result(self) -> Result | Token:
-        return self._result
-
-    @result.setter
-    def result(self, result: Result | Token) -> None:
-        self._result = result
-
-    @property
-    def status(self) -> Literal["pending", "done", "failed"]:
-        if isinstance(self.result, Token):
-            return "pending"
-        if isinstance(self.result, Result):
-            return "done"
-
-        msg = f"Expected result of run to be of type `Result` or `Token`, but got `{type(self.result)}`"
-        raise ValueError(msg)

@@ -7,7 +7,7 @@ from slash.core import Elem, Session
 from slash.events import ClickEvent, SupportsOnClick
 from slash.js import JSFunction
 
-from bench.templates import Run
+from bench._components import Run
 
 
 def timedelta_to_str(t: timedelta) -> str:

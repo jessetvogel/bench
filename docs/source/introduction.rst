@@ -12,7 +12,7 @@ Similarly, a new class of methods is created as a Python class deriving from the
 These classes can then be added to a :py:class:`Bench` instance using :py:meth:`Bench.task() <bench.Bench.task>` and :py:meth:`Bench.method() <bench.Bench.method>`.
 
 Next, the :py:meth:`Bench.run() <bench.Bench.run>` decorator is used to set a callback function that executes a given task with a given method.
-Such a callback function should return a :py:class:`~bench.templates.Result` instance (or an instance of a user-defined result type that was added using :py:meth:`Bench.result() <bench.Bench.result>`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
+Such a callback function should return a :py:class:`~bench.templates.Result` instance (e.g., a :py:class:`~bench.templates.PlainResult` or an instance of a user-defined result type that was added using :py:meth:`Bench.result() <bench.Bench.result>`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
 
 Raw results can be converted into insightful metrics by adding methods to the :py:class:`~bench.templates.Task` subclass,
 which are decorated by a :py:class:`~bench.templates.Metric` instance.

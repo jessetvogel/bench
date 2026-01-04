@@ -68,6 +68,10 @@ body {
     }
 }
 
+.wy-menu-vertical li.toctree-l1.current>a {
+    border: none;
+}
+
 .wy-nav-side {
     background-color: var(--dark-gray);
 }

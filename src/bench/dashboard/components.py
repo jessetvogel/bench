@@ -21,12 +21,12 @@ from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
 from bench._cache import BENCH_CACHE
-from bench._engine import Engine, ExecutionProcess
+from bench._engine import Engine, ExecutionProcess, Run
 from bench._logging import get_logger
 from bench.dashboard._ansi import ansi2html
 from bench.dashboard.utils import RunGroup, Timer, download_file, get_color, timedelta_to_str
 from bench.metrics import Graph, Metric, Table, Time
-from bench.templates import Param, Run, Task
+from bench.templates import Param, Task
 
 _LOGGER = get_logger("bench")
 
