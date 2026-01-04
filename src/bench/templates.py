@@ -125,7 +125,9 @@ class Task(ABC, Serializable):
 
         The result of this function should be compatible with :py:meth:`type_constructor`.
         """
-        return _params_default(cls.type_constructor())
+        if (constructor := cls.type_constructor()) is cls:
+            return _params_default(cls.__init__)
+        return _params_default(constructor)
 
     @classmethod
     def type_metrics(cls) -> tuple[Metric[Any]]:
@@ -200,6 +202,42 @@ class Method(ABC, Serializable):
     def decode(cls, data: PlainData) -> Self: ...
 
 
+class Result(ABC, Serializable):
+    """Abstract base class for a result."""
+
+    @classmethod
+    def type_label(cls) -> str:
+        return cls.__name__
+
+    @abstractmethod
+    def encode(self) -> PlainData: ...
+
+    @classmethod
+    @abstractmethod
+    def decode(cls, data: PlainData) -> Self: ...
+
+
+class PlainResult(Result):
+    """Result class containing arbitrary plain data."""
+
+    def __init__(self, **data: PlainData) -> None:
+        self._data = dict(data)
+
+    def __getitem__(self, index: str) -> PlainData:
+        return self._data[index]
+
+    def __setitem__(self, index: str, value: PlainData) -> None:
+        self._data[index] = value
+
+    def encode(self) -> PlainData:
+        return dict(self._data)
+
+    @classmethod
+    def decode(cls, data: PlainData) -> Self:
+        assert isinstance(data, dict)
+        return cls(**data)
+
+
 class Token(Serializable):
     """Token class, can be used to poll for a result."""
 
@@ -216,31 +254,6 @@ class Token(Serializable):
     @classmethod
     def decode(cls, data: PlainData) -> Self:
         return cls(data)
-
-
-class Result(Serializable):
-    """Result class."""
-
-    def __init__(self, **data: PlainData) -> None:
-        self._data = dict(data)
-
-    def __getitem__(self, index: str) -> PlainData:
-        return self._data[index]
-
-    def __setitem__(self, index: str, value: PlainData) -> None:
-        self._data[index] = value
-
-    @classmethod
-    def type_label(cls) -> str:
-        return cls.__name__
-
-    def encode(self) -> PlainData:
-        return dict(self._data)
-
-    @classmethod
-    def decode(cls, data: PlainData) -> Self:
-        assert isinstance(data, dict)
-        return cls(**data)
 
 
 class BenchError(Exception, Serializable):
@@ -264,6 +277,37 @@ class BenchError(Exception, Serializable):
     @classmethod
     def decode(cls, data: PlainData) -> Self:
         return cls(cast(str, data))
+
+
+MT = TypeVar("MT", bound=Task)
+MR = TypeVar("MR", bound=Result)
+MV = TypeVar("MV")
+
+
+class Metric(Generic[MV]):
+    """Base class for a metric."""
+
+    def __call__(self, f: Callable[[MT, MR], MV]) -> Callable[[MT, MR], MV]:
+        if hasattr(self, "_function"):
+            msg = "Can only use once"  # FIXME: better error message
+            raise RuntimeError(msg)
+        self._function = f  # TODO: better variable name
+        setattr(f, "_metric", self)
+        return f
+
+    def evaluate(self, task: Task, result: Result) -> MV:
+        self._check_is_bound()
+        return self._function(cast(Any, task), cast(Any, result))
+
+    @property
+    def name(self) -> str:
+        self._check_is_bound()
+        return self._function.__name__
+
+    def _check_is_bound(self) -> None:
+        if not hasattr(self, "_function"):
+            msg = "Not bound yet"  # FIXME: better error message
+            raise RuntimeError(msg)
 
 
 class Run:
@@ -302,33 +346,3 @@ class Run:
 
         msg = f"Expected result of run to be of type `Result` or `Token`, but got `{type(self.result)}`"
         raise ValueError(msg)
-
-
-MV = TypeVar("MV")
-MT = TypeVar("MT", bound=Task)
-
-
-class Metric(Generic[MV]):
-    """Base class for a metric."""
-
-    def __call__(self, f: Callable[[MT, Result], MV]) -> Callable[[MT, Result], MV]:
-        if hasattr(self, "_function"):
-            msg = "Can only use once"  # FIXME: better error message
-            raise RuntimeError(msg)
-        self._function = f  # TODO: better variable name
-        setattr(f, "_metric", self)
-        return f
-
-    def evaluate(self, task: Task, result: Result) -> MV:
-        self._check_is_bound()
-        return self._function(cast(Any, task), result)
-
-    @property
-    def name(self) -> str:
-        self._check_is_bound()
-        return self._function.__name__
-
-    def _check_is_bound(self) -> None:
-        if not hasattr(self, "_function"):
-            msg = "Not bound yet"  # FIXME: better error message
-            raise RuntimeError(msg)

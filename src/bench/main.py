@@ -22,13 +22,18 @@ def main_dashboard() -> int:
     try:
         # Create engine
         engine = Engine(path)
-        # Start dashboard
-        Dashboard(engine).run()
-        # Shutdown engine
-        engine.shutdown()
-    except Exception as err:
+    except FileNotFoundError as err:
         logger.error(str(err))
         return 1
+    except Exception:
+        logger.exception(f"Failed to load '{path}'")
+        return 1
+
+    # Start dashboard
+    Dashboard(engine).run()
+
+    # Shutdown engine
+    engine.shutdown()
 
     return 0
 

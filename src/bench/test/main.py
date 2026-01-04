@@ -14,6 +14,21 @@ from bench.templates import Method, Result, Task
 bench = Bench("test")
 
 
+@bench.result
+class OutcomeResult(Result):
+    def __init__(self, outcome: float, seconds: float) -> None:
+        self.outcome = outcome
+        self.seconds = seconds
+
+    def encode(self) -> PlainData:
+        return {"outcome": self.outcome, "seconds": self.seconds}
+
+    @classmethod
+    def decode(cls, data: PlainData) -> Self:
+        assert isinstance(data, dict)
+        return cls(outcome=cast(float, data["outcome"]), seconds=cast(float, data["seconds"]))
+
+
 @bench.task
 class TaskAdd(Task):
     def __init__(self, x: int, y: int) -> None:
@@ -29,15 +44,15 @@ class TaskAdd(Task):
         return cls(cast(int, data["x"]), cast(int, data["y"]))
 
     @Time()
-    def metric_time(self, result: Result) -> dict[str, timedelta]:
+    def metric_time(self, result: OutcomeResult) -> dict[str, timedelta]:
         return {
-            "time": timedelta(seconds=cast(float, result["sec"])),
+            "time": timedelta(seconds=cast(float, result.seconds)),
         }
 
     @Table()
-    def metric_table(self, result: Result) -> dict[str, Any]:
+    def metric_table(self, result: OutcomeResult) -> dict[str, Any]:
         return {
-            "error": abs(self.x + self.y - cast(float, result["sum"])),
+            "error": abs(self.x + self.y - cast(float, result.outcome)),
         }
 
 
@@ -56,15 +71,15 @@ class TaskProd(Task):
         return cls(cast(int, data["u"]), cast(int, data["v"]))
 
     @Time()
-    def metric_time(self, result: Result) -> dict[str, timedelta]:
+    def metric_time(self, result: OutcomeResult) -> dict[str, timedelta]:
         return {
-            "time": timedelta(seconds=cast(float, result["sec"])),
+            "time": timedelta(seconds=cast(float, result.seconds)),
         }
 
     @Table()
-    def metric_table(self, result: Result) -> dict[str, int | float | str | None]:
+    def metric_table(self, result: OutcomeResult) -> dict[str, int | float | str | None]:
         return {
-            "error": abs(self.u * self.v - cast(float, result["prod"])),
+            "error": abs(self.u * self.v - cast(float, result.outcome)),
         }
 
 
@@ -80,13 +95,11 @@ class MethodExact(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls()
 
-    def solve(self, task: Task) -> Result:
+    def solve(self, task: Task) -> float:
         if isinstance(task, TaskAdd):
-            sum = task.x + task.y
-            return Result(sum=sum)
+            return task.x + task.y
         if isinstance(task, TaskProd):
-            prod = task.u * task.v
-            return Result(prod=prod)
+            return task.u * task.v
         raise NotImplementedError()
 
 
@@ -102,13 +115,11 @@ class MethodApprox(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls()
 
-    def solve(self, task: Task) -> Result:
+    def solve(self, task: Task) -> float:
         if isinstance(task, TaskAdd):
-            sum = task.x + task.y + random.uniform(-0.5, +0.5)
-            return Result(sum=sum)
+            return task.x + task.y + random.uniform(-0.5, +0.5)
         if isinstance(task, TaskProd):
-            prod = task.u * task.v + random.uniform(-0.5, +0.5)
-            return Result(prod=prod)
+            return task.u * task.v + random.uniform(-0.5, +0.5)
         raise NotImplementedError()
 
 
@@ -117,7 +128,10 @@ def run(task: Task, method: Method) -> Result:
     assert isinstance(task, (TaskAdd, TaskProd))
     assert isinstance(method, (MethodExact, MethodApprox))
     start_time = time.perf_counter()
-    result = method.solve(task)
+    outcome = method.solve(task)
     end_time = time.perf_counter()
-    result["sec"] = end_time - start_time
+    result = OutcomeResult(
+        outcome=outcome,
+        seconds=end_time - start_time,
+    )
     return result

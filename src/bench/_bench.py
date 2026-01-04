@@ -3,7 +3,7 @@ from collections.abc import Callable, Iterable
 from typing import TypeVar, get_type_hints
 
 from bench._logging import get_logger
-from bench.templates import Method, Result, Task, Token
+from bench.templates import Method, PlainResult, Result, Task, Token
 
 _LOGGER = get_logger("bench")
 
@@ -24,7 +24,7 @@ class Bench:
         self._name = name
         self._task_types: list[type[Task]] = []
         self._method_types: list[type[Method]] = []
-        self._result_types: list[type[Result]] = [Result]
+        self._result_types: list[type[Result]] = [PlainResult]
         self._run_handler: Callable[[Task, Method], Result | Token] | None = None
         self._poll_handler: Callable[[Token], Result | None] | None = None
 

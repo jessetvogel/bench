@@ -4,7 +4,7 @@ import pytest
 
 from bench import Bench
 from bench.serialization import PlainData
-from bench.templates import Method, Metric, Result, Task
+from bench.templates import Method, Metric, PlainResult, Result, Task
 
 
 class T(Task):
@@ -39,7 +39,15 @@ class M(Method):
 
 
 class R(Result):
-    pass
+    def __init__(self) -> None:
+        pass
+
+    def encode(self) -> PlainData:
+        return {}
+
+    @classmethod
+    def decode(cls, data: PlainData) -> Self:
+        return cls()
 
 
 def test_bench_add_type_that_does_not_derive_from() -> None:
@@ -94,4 +102,4 @@ def test_bench_add_types_are_stored() -> None:
 
     assert list(bench.task_types) == [T1, T2]
     assert list(bench.method_types) == [M1, M2]
-    assert list(bench.result_types) == [Result, R1, R2]
+    assert list(bench.result_types) == [PlainResult, R1, R2]

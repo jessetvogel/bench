@@ -13,7 +13,7 @@ from bench._logging import get_logger
 from bench._process import Process
 from bench._utils import to_hash
 from bench.serialization import check_serializable
-from bench.templates import MV, BenchError, Method, Metric, Result, Run, Task, Token
+from bench.templates import MV, Method, Metric, Result, Run, Task, Token
 
 
 class Engine:
@@ -154,14 +154,14 @@ class Engine:
             raise RuntimeError(msg)
 
         # Perform task with method
-        result: Result | BenchError | None
+        result: Result | None = None
         try:
             result = poll_handler(token)
-        except Exception as err:
-            result = BenchError(str(err))
+        except Exception:
             self._logger.exception("Poll failed due to the following error:")
+            return None
 
-        # TODO: finish this function
+        # TODO: Finish this function
         result = result
         return None
 

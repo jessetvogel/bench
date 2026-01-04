@@ -8,7 +8,7 @@ from typing import Any, Self
 from bench import Bench
 from bench.metrics import Table, Time
 from bench.serialization import PlainData
-from bench.templates import Method, Result, Task
+from bench.templates import Method, PlainResult, Task
 
 # Create `Bench` instance
 bench = Bench("Root finding")
@@ -29,11 +29,11 @@ class Cubic(Task):
     # The following two methods define metrics that are derived from
     # the result of a task.
     @Time()
-    def time(self, result: Result) -> dict[str, timedelta]:
+    def time(self, result: PlainResult) -> dict[str, timedelta]:
         return {"time": timedelta(seconds=result["seconds"])}
 
     @Table()
-    def table(self, result: Result) -> dict[str, Any]:
+    def table(self, result: PlainResult) -> dict[str, Any]:
         x = result["x"]
         y = self.f(x)
         return {
@@ -78,7 +78,7 @@ class RandomSolver(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls(data["x_min"], data["x_max"])
 
-    def find_root(self, cubic: Cubic) -> Result:
+    def find_root(self, cubic: Cubic) -> PlainResult:
         # Sample the function at 1,000 random points
         # and keep track of the best x value
         num_evals = 1_000
@@ -89,7 +89,7 @@ class RandomSolver(Method):
             abs_y = abs(cubic.f(x))
             if abs_y < best_abs_y:
                 best_x, best_abs_y = x, abs_y
-        return Result(x=best_x, num_evals=num_evals)
+        return PlainResult(x=best_x, num_evals=num_evals)
 
 
 @bench.method
@@ -107,7 +107,7 @@ class NewtonSolver(Method):
     def decode(cls, data: PlainData) -> Self:
         return cls(data["x_0"], data["eps"])
 
-    def find_root(self, cubic: Cubic) -> Result:
+    def find_root(self, cubic: Cubic) -> PlainResult:
         # Apply 1,000 iterations to update `x` with Newton's method
         num_iters = 1_000
         num_evals = 0
@@ -119,11 +119,11 @@ class NewtonSolver(Method):
                 break
             x -= cubic.f(x) / df
             num_evals += 1
-        return Result(x=x, num_evals=num_evals)
+        return PlainResult(x=x, num_evals=num_evals)
 
 
 @bench.run
-def run(task: Task, method: Method) -> Result:
+def run(task: Task, method: Method) -> PlainResult:
     assert isinstance(task, Cubic)
     assert isinstance(method, (RandomSolver, NewtonSolver))
 
