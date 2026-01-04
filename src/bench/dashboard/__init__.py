@@ -40,12 +40,14 @@ class Dashboard:
             }
         )
 
-        content = Signal[Elem](PageNewTask(self._engine))
+        content = Signal[Elem](Div())
         Effect(lambda: content_elem.clear().append(content()))
 
         menu = Menu(
             self._engine,
             content=content,
         ).style({"flex-shrink": "0"})
+
+        content.set(PageNewTask(self._engine, menu))
 
         return Row(menu, content_elem)

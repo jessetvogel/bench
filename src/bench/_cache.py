@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 
 from bench import Bench
-from bench._logging import RESET, WHITE, get_logger
+from bench._logging import GRAY, RESET, WHITE, get_logger
 from bench._utils import to_hash
 from bench.serialization import from_json, to_json
 from bench.templates import Method, Result, Run, Task, Token
@@ -234,6 +234,7 @@ class Cache:
             assert isinstance(status, str)
             assert isinstance(result_type_name, str)
             assert isinstance(result_blob, bytes)
+            run: Run | None = None
             if run_id in self._runs:
                 run = self._runs[run_id]
             else:
@@ -241,11 +242,13 @@ class Cache:
                     run = self._parse_run(run_id, task_id, method_id, status, result_type_name, result_blob)
                 except Exception as err:
                     self._logger.error(
-                        f"Failed to deserialize method of type '{result_type_name}' ({err}):\n\n{result_blob.decode()}"
+                        f"Failed to deserialize method of type '{result_type_name}': {err}\n"
+                        f"{GRAY}{result_blob.decode()}{RESET}"
                     )
-                if run.status != "pending":
+                if run is not None and run.status != "pending":
                     self._runs[run_id] = run
-            runs.append(run)
+            if run is not None:
+                runs.append(run)
         return runs
 
     def delete_runs(self, runs: list[Run]) -> None:

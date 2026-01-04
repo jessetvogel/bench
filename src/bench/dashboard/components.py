@@ -51,7 +51,8 @@ class Menu(Column):
         super().__init__()
         self._engine = engine
         self._content = content
-        self._executions = Signal(self._engine.execution_processes)
+        self._tasks = Signal(self._engine.cache.select_tasks())
+        self._processes = Signal(self._engine.execution_processes)
         self._setup()
 
     def _setup(self) -> None:
@@ -71,18 +72,18 @@ class Menu(Column):
         )
         # Tasks
         self.append(
-            self._header("Tasks", mini_button("+").onclick(lambda: self._content.set(PageNewTask(self._engine)))).style(
-                {"justify-content": "space-between", "padding-right": "0px"}
-            )
+            self._header(
+                "Tasks",
+                action_button("+").onclick(lambda: self._content.set(PageNewTask(self._engine, self))),
+            ).style({"justify-content": "space-between", "padding-right": "0px"}),
+            self._tasks_column(),
         )
-        for task in self._engine.cache.select_tasks():
-            self.append(self._item(task.label(), onclick=lambda _, t=task: self._click_task(t)))
         # Processes
-        self.append(self._processes())
+        self.append(self._processes_column())
         # Theme
         self.append(self._theme_buttons())
         # Timer
-        self.append(Timer(self._refresh, seconds=1.0, repeat=True))
+        self.append(Timer(self.refresh, seconds=1.0, repeat=True))
 
     def _header(self, *children: Children) -> Elem:
         return Div(*children).style(
@@ -97,7 +98,7 @@ class Menu(Column):
             }
         )
 
-    def _item(self, *children: Children, onclick: Callable[..., Awaitable[Any] | Any] | None = None) -> Elem:
+    def _item(self, *children: Children, onclick: Callable[[], Awaitable[Any] | Any] | None = None) -> Elem:
         item = Div(*children).style(
             {
                 "display": "flex",
@@ -109,7 +110,7 @@ class Menu(Column):
             }
         )
         if onclick is not None:
-            item.onclick(onclick)
+            item.onclick(lambda: onclick())
         return item
 
     def _separator(self) -> Elem:
@@ -131,13 +132,24 @@ class Menu(Column):
     def _click_process(self, execution: ExecutionProcess) -> None:
         self._content.set(PageProcess(self._engine, execution))
 
-    def _processes(self) -> Elem:
+    def _tasks_column(self) -> Elem:
+        column = Column()
+
+        def set_column() -> None:
+            column.clear()
+            for task in self._tasks():
+                column.append(self._item(task.label(), onclick=lambda t=task: self._click_task(t)))  # type: ignore[misc]
+
+        Effect(set_column)
+        return column
+
+    def _processes_column(self) -> Elem:
         column = Column()
 
         def set_column() -> None:
             column.clear()
 
-            executions = self._executions()
+            executions = self._processes()
             if executions:
                 column.append(self._header("Processes"))
 
@@ -174,7 +186,7 @@ class Menu(Column):
                 )
 
             def refresh_statuses() -> None:
-                for execution in self._executions():
+                for execution in self._processes():
                     statuses[execution.id].set(execution.process.poll())
 
             column.append(Timer(refresh_statuses, seconds=1.0, repeat=True))
@@ -190,16 +202,18 @@ class Menu(Column):
         else:
             return "error"
 
-    def _refresh(self) -> None:
-        self._executions.set(self._engine.execution_processes)
+    def refresh(self) -> None:
+        self._tasks.set(self._engine.cache.select_tasks())
+        self._processes.set(self._engine.execution_processes)
 
 
 class PageNewTask(Div):
     """Page element for creating a new task."""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, menu: Menu) -> None:
         super().__init__()
         self._engine = engine
+        self._menu = menu
         self._setup()
 
     def _setup(self) -> None:
@@ -228,13 +242,14 @@ class PageNewTask(Div):
     def _create_task(self, task_type: type[Task]) -> None:
         if self._dialog_new_task is not None:
             self._dialog_new_task.unmount()
-        self._dialog_new_task = DialogNewTask(self._engine, task_type).mount().show_modal()
+        self._dialog_new_task = DialogNewTask(self._engine, self._menu, task_type).mount().show_modal()
 
 
 class DialogNewTask(Dialog):
-    def __init__(self, engine: Engine, task_type: type[Task]) -> None:
+    def __init__(self, engine: Engine, menu: Menu, task_type: type[Task]) -> None:
         super().__init__()
         self._engine = engine
+        self._menu = menu
         self._task_type = task_type
         self._setup()
 
@@ -250,7 +265,9 @@ class DialogNewTask(Dialog):
         self._form = form
 
     def _handle_click_create(self) -> None:
+        # Close dialog
         self.close()
+        # Create task
         task_kwargs = {param.name: self._form.value(param) for param in self._task_type.type_params()}
         try:
             self._engine.create_task(self._task_type, **task_kwargs)
@@ -264,6 +281,9 @@ class DialogNewTask(Dialog):
                 details="See the console for details.",
                 level="error",
             )
+            return
+        # Refresh menu
+        self._menu.refresh()
 
 
 class PageProcess(Div):
@@ -303,7 +323,7 @@ class PageProcess(Div):
         self.append(
             Row(
                 H3("Process information"),
-                button_cancel := mini_button(Icon("cancel").style({"opacity": "0.8", "--icon-size": "20px"})).onclick(
+                button_cancel := action_button(Icon("cancel").style({"opacity": "0.8", "--icon-size": "20px"})).onclick(
                     self._cancel_process
                 ),
                 Tooltip("Cancel process", target=button_cancel),
@@ -372,15 +392,15 @@ class PageTask(Div):
         self.append(
             Row(
                 H3("Compare methods"),
-                button_new_run := mini_button(
+                button_new_run := action_button(
                     Span("+").style({"opacity": "0.8"}),
                 ).onclick(lambda: dialog_new_run.show_modal()),
                 Tooltip("New run", target=button_new_run),
-                button_refresh := mini_button(
+                button_refresh := action_button(
                     Icon("refresh").style({"opacity": "0.8", "--icon-size": "20px"}),
                 ).onclick(self._refresh_runs),
                 Tooltip("Refresh", target=button_refresh),
-                button_delete := mini_button(
+                button_delete := action_button(
                     Icon("trash").style({"opacity": "0.8", "--icon-size": "20px"}),
                 ).onclick(self._delete_selected_runs),
                 Tooltip("Delete selected runs", target=button_delete),
@@ -395,7 +415,7 @@ class PageTask(Div):
         self.append(
             header_metrics := Row(
                 H3("Metrics"),
-                button_download_metrics := mini_button(
+                button_download_metrics := action_button(
                     Icon("download").style({"opacity": "0.8", "--icon-size": "20px"})
                 ).onclick(self._download_metrics),
                 Tooltip("Download metrics as JSON", target=button_download_metrics),
@@ -841,7 +861,7 @@ class Form(Div):
         return str(value)
 
 
-def mini_button(*children: Children) -> Button:
+def action_button(*children: Children) -> Button:
     return Button(*children).style(
         {
             "min-width": "inherit",
