@@ -507,23 +507,25 @@ class PageTask(Div):
         msg = Column(
             Span("Are you sure you want to delete the following runs?").style({"font-weight": "bold"}),
             Span("This action can not be undone!"),
-            [
-                Span(
-                    Span(self._engine.cache.select_method(group.method_id).label()).style(
-                        {
-                            "background-color": group.color,
-                            "color": "var(--white)",
-                            "padding": "3px 6px",
-                            "border-radius": "4px",
-                        }
-                    ),
-                    " ",
-                    Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
-                )
-                for group in selected_groups
-            ],
+            Column(
+                [
+                    Span(
+                        Span(self._engine.cache.select_method(group.method_id).label()).style(
+                            {
+                                "background-color": group.color,
+                                "color": "var(--white)",
+                                "padding": "3px 6px",
+                                "border-radius": "4px",
+                            }
+                        ),
+                        " ",
+                        Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
+                    )
+                    for group in selected_groups
+                ]
+            ).style({"gap": "12px", "padding": "8px"}),
         ).style({"gap": "12px"})
-        if await confirm(msg):
+        if await confirm(msg, ok_text="Yes"):
             runs = [run for group in selected_groups for run in group.runs]
             self._engine.delete_runs(runs)
             self._selected_groups.set([])
