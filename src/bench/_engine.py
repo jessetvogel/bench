@@ -97,7 +97,7 @@ class Engine:
             )
         )
 
-    def execute_run(self, task: Task, method: Method) -> Run:
+    def execute_run(self, task: Task, method: Method) -> Run | None:
         """Execute run from task and method.
 
         Args:
@@ -109,21 +109,21 @@ class Engine:
             raise RuntimeError(msg)
 
         # Perform task with method
-        result: Result | Token | BenchError
         try:
             result = run_handler(task, method)
-        except Exception as err:
-            result = BenchError(str(err))
+        except Exception:
             self._logger.exception("Run failed due to the following error:")
-        # Create run from result
-        run = Run(
-            id=secrets.token_hex(8),
-            task_id=to_hash(task),
-            method_id=to_hash(method),
-            result=result,
+            return None
+
+        # Create and store run from result
+        self.cache.insert_or_update_run(
+            run := Run(
+                id=secrets.token_hex(8),
+                task_id=to_hash(task),
+                method_id=to_hash(method),
+                result=result,
+            )
         )
-        # Store run
-        self.cache.insert_or_update_run(run)
 
         return run
 

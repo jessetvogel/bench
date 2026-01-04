@@ -8,7 +8,7 @@ from bench import Bench
 from bench._logging import RESET, WHITE, get_logger
 from bench._utils import to_hash
 from bench.serialization import from_json, to_json
-from bench.templates import BenchError, Method, Result, Run, Task, Token
+from bench.templates import Method, Result, Run, Task, Token
 
 BENCH_CACHE = ".bench_cache"
 GITIGNORE = ".gitignore"
@@ -271,16 +271,14 @@ class Cache:
     def _parse_run(
         self, run_id: str, task_id: str, method_id: str, status: str, result_type_name: str, result_blob: bytes
     ) -> Run:
-        result: Result | Token | BenchError
+        result: Result | Token
         if status == "pending":
             result = from_json(Token, result_blob.decode())
         elif status == "done":
             result_type = self._bench.get_result(result_type_name)
             result = from_json(result_type, result_blob.decode())
-        elif status == "failed":
-            result = from_json(BenchError, result_blob.decode())
         else:
-            msg = f"Encountered status '{status}', expected 'pending', 'done' or 'failed'"
+            msg = f"Encountered status '{status}', expected 'pending' or 'done'"
             raise RuntimeError(msg)
         return Run(run_id, task_id, method_id, result)
 

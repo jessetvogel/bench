@@ -74,7 +74,7 @@ def main_run() -> int:
         logger.info(f"Executing run {it + 1}/{num_runs} ..")
         run = engine.execute_run(task, method)
         # If run failed, stop
-        if run.status == "failed":
+        if run is None:
             return 1
 
     # Shutdown engine
