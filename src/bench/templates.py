@@ -263,35 +263,38 @@ class Metric(Generic[MV]):
     """Base class for a metric."""
 
     def __call__(self, f: Callable[[MT, MR], MV]) -> Callable[[MT, MR], MV]:
-        if hasattr(self, "_function"):
-            msg = "Can only use once"  # FIXME: better error message
+        """Bound the metric to a task method."""
+        if hasattr(self, "_task_method"):
+            msg = "Metric instance is already bound to a task method"
             raise RuntimeError(msg)
-        self._validate_function(f)
-        self._function = f
+        self._validate_task_method(f)
+        self._task_method = f
         setattr(f, "_metric", self)
         return f
 
     def evaluate(self, task: Task, result: Result) -> MV:
-        self._check_has_function()
+        """Evaluate the metric on the given task and result."""
+        self._check_has_task_method()
         self._check_result_matches_type_hint(result)
-        return self._function(cast(Any, task), cast(Any, result))
+        return self._task_method(cast(Any, task), cast(Any, result))
 
     @property
     def name(self) -> str:
-        self._check_has_function()
-        return self._function.__name__  # ty: ignore[possibly-missing-attribute]
+        """Name of the method bound to the metric."""
+        self._check_has_task_method()
+        return self._task_method.__name__  # ty: ignore[possibly-missing-attribute]
 
     @classmethod
     @abstractmethod
     def encode_value(cls, value: MV) -> PlainData: ...
 
-    def _check_has_function(self) -> None:
+    def _check_has_task_method(self) -> None:
         # Check that metric has an associated function
-        if not hasattr(self, "_function"):
-            msg = "Not bound yet"  # FIXME: better error message
+        if not hasattr(self, "_task_method"):
+            msg = "Metric instance is not yet bound to a task method"
             raise RuntimeError(msg)
 
-    def _validate_function(self, f: Callable[[MT, MR], MV]) -> None:
+    def _validate_task_method(self, f: Callable[[MT, MR], MV]) -> None:
         # Check that `f` has two parameters
         f_params = list(inspect.signature(f).parameters)
         if len(f_params) != 2:
@@ -316,7 +319,7 @@ class Metric(Generic[MV]):
 
         if not isinstance(result, self._type_hint_result):
             _LOGGER.warning(
-                f"Metric method `{self._function.__qualname__}` has result parameter with type hint "  # ty: ignore[possibly-missing-attribute]
+                f"Metric method `{self._task_method.__qualname__}` has result parameter with type hint "  # ty: ignore[possibly-missing-attribute]
                 f"`{self._type_hint_result.__name__}`, but is evaluated on result of type `{type(result).__name__}`"
             )
             self._has_warned = True  # warn at most once per metric
