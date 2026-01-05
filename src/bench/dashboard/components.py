@@ -536,13 +536,15 @@ class PageTask(Div):
         path = Path(BENCH_CACHE) / "tmp" / f"{self._task.label()}.json"
         path.parent.mkdir(exist_ok=True, parents=True)
         # Construct data and write data to file
-        # TODO: add `encode_value(self, value: MV) -> str` method on `Metric` and use that
         type_metrics = self._task.type_metrics()
         data = [  # TODO: try-catch
             {
                 "method": self._engine.cache.select_method(group.method_id).encode(),
                 "runs": [
-                    {metric.name: self._engine.evaluate_metric(metric, run) for metric in type_metrics}
+                    {
+                        metric.name: metric.encode_value(self._engine.evaluate_metric(metric, run))
+                        for metric in type_metrics
+                    }
                     for run in group.runs_done
                 ],
             }

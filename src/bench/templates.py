@@ -5,9 +5,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
 
+from bench._logging import get_logger
 from bench.serialization import PlainData, Serializable, is_plain_data
 
 T = TypeVar("T", bound=int | float | str)
+
+_LOGGER = get_logger("bench")
 
 
 class Param(Generic[T]):
@@ -263,24 +266,57 @@ class Metric(Generic[MV]):
         if hasattr(self, "_function"):
             msg = "Can only use once"  # FIXME: better error message
             raise RuntimeError(msg)
-        self._function = f  # TODO: better variable name
+        self._validate_function(f)
+        self._function = f
         setattr(f, "_metric", self)
         return f
 
     def evaluate(self, task: Task, result: Result) -> MV:
-        self._check_is_bound()
+        self._check_has_function()
+        self._check_result_matches_type_hint(result)
         return self._function(cast(Any, task), cast(Any, result))
 
     @property
     def name(self) -> str:
-        self._check_is_bound()
+        self._check_has_function()
         return self._function.__name__  # ty: ignore[possibly-missing-attribute]
-
-    def _check_is_bound(self) -> None:
-        if not hasattr(self, "_function"):
-            msg = "Not bound yet"  # FIXME: better error message
-            raise RuntimeError(msg)
 
     @classmethod
     @abstractmethod
     def encode_value(cls, value: MV) -> PlainData: ...
+
+    def _check_has_function(self) -> None:
+        # Check that metric has an associated function
+        if not hasattr(self, "_function"):
+            msg = "Not bound yet"  # FIXME: better error message
+            raise RuntimeError(msg)
+
+    def _validate_function(self, f: Callable[[MT, MR], MV]) -> None:
+        # Check that `f` has two parameters
+        f_params = list(inspect.signature(f).parameters)
+        if len(f_params) != 2:
+            msg = f"Expected method with 2 arguments, but got {len(f_params)}"
+            raise ValueError(msg)
+        # Store type hint of result parameter of `f`
+        type_hint_result = cast(type | None, get_type_hints(f)[f_params[1]])
+        if type_hint_result is not None:
+            if not issubclass(type_hint_result, Result):
+                _LOGGER.warning(
+                    f"Metric method `{f.__qualname__}` has parameter with type hint "  # ty: ignore[unresolved-attribute]
+                    f"`{type_hint_result.__name__}`, but expected a `Result` type"
+                )
+                type_hint_result = None
+        self._type_hint_result = type_hint_result
+        self._has_warned = False
+
+    def _check_result_matches_type_hint(self, result: Result) -> None:
+        # Log warning if the type of the result does not match the type hint
+        if self._has_warned or self._type_hint_result is None:
+            return
+
+        if not isinstance(result, self._type_hint_result):
+            _LOGGER.warning(
+                f"Metric method `{self._function.__qualname__}` has result parameter with type hint "  # ty: ignore[possibly-missing-attribute]
+                f"`{self._type_hint_result.__name__}`, but is evaluated on result of type `{type(result).__name__}`"
+            )
+            self._has_warned = True  # warn at most once per metric
