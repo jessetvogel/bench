@@ -24,7 +24,7 @@ class Param(Generic[T]):
     def __init__(
         self,
         name: str,
-        type: type[T],
+        type: type[T],  # ty: ignore[invalid-type-form]
         *,
         options: list[T] | None = None,
         default: T | None = None,
@@ -41,7 +41,7 @@ class Param(Generic[T]):
         return self._name
 
     @property
-    def type(self) -> type[T]:
+    def type(self) -> type[T]:  # ty: ignore[invalid-type-form]
         return self._type
 
     @property
@@ -116,7 +116,7 @@ class Task(ABC, Serializable):
         return _params_default(constructor)
 
     @classmethod
-    def type_metrics(cls) -> tuple[Metric[Any]]:
+    def type_metrics(cls) -> tuple[Metric[Any], ...]:
         """Metrics of the class of tasks.
 
         The metrics are automatically detected as the methods of the class which are
@@ -274,9 +274,13 @@ class Metric(Generic[MV]):
     @property
     def name(self) -> str:
         self._check_is_bound()
-        return self._function.__name__
+        return self._function.__name__  # ty: ignore[possibly-missing-attribute]
 
     def _check_is_bound(self) -> None:
         if not hasattr(self, "_function"):
             msg = "Not bound yet"  # FIXME: better error message
             raise RuntimeError(msg)
+
+    @classmethod
+    @abstractmethod
+    def encode_value(cls, value: MV) -> PlainData: ...

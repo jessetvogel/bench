@@ -48,12 +48,12 @@ def default_encode(cls: type[T], object: T) -> PlainData:
         return object
 
     cls_origin: type = get_origin(cls) or cls
-    cls_args: tuple[Any, ...] = get_args(cls) or tuple()
+    cls_args: tuple[Any, ...] | None = get_args(cls) or None
 
     # `list[A]`
     if cls_origin is list:
         assert isinstance(object, list), "object is not of type list"
-        assert len(cls_args) == 1, "list requires precisely one argument"
+        assert cls_args is not None and len(cls_args) == 1, "list requires precisely one argument"
         item_cls = cast(type, cls_args[0])
         return [default_encode(item_cls, x) for x in object]
 
@@ -63,12 +63,18 @@ def default_encode(cls: type[T], object: T) -> PlainData:
     # `dict[K, V]`
     if cls_origin is dict:
         assert isinstance(object, dict), "object is not of type dict"
-        assert len(cls_args) == 2, "dict requires precisely two arguments"
+        assert cls_args is not None and len(cls_args) == 2, "dict requires precisely two arguments"
         key_cls, value_cls = cast(tuple[type, ...], cls_args)
 
         # `dict[str, V]`
         if key_cls is str:
-            return {key: default_encode(value_cls, value) for key, value in object.items()}
+            encoded: dict[str, PlainData] = {}
+            for key, value in object.items():
+                if not isinstance(key, str):
+                    msg = f"Expected keys of type `str`, but got `{type(key).__name__}`"
+                    raise EncodingError(msg)
+                encoded[key] = default_encode(value_cls, value)
+            return encoded
 
         # `dict[K, V]`
         return [[default_encode(key_cls, key), default_encode(value_cls, value)] for key, value in object.items()]
@@ -76,6 +82,7 @@ def default_encode(cls: type[T], object: T) -> PlainData:
     # `types.UnionType[...]`
     # TODO: If `object` matches multiple `cls_arg`, then an error must be raised for being ambigious
     if cls_origin is UnionType:
+        assert cls_args is not None
         for cls_arg in cls_args:
             cls_arg_origin = get_origin(cls_arg) or cls_arg
             if isinstance(object, cls_arg_origin):
@@ -85,8 +92,8 @@ def default_encode(cls: type[T], object: T) -> PlainData:
 
     # `typing.Literal[...]`
     if cls_origin is Literal:
-        assert object in cls_args
-        return object  # type: ignore[return-value]
+        msg = "Could not be literal, because then it should have been an int, float or str"
+        raise EncodingError(msg)
 
     # `timedelta`
     if cls_origin is timedelta:
@@ -118,11 +125,11 @@ def default_decode(cls: type[T], data: PlainData) -> T:
         return cast(T, data)
 
     cls_origin: type = get_origin(cls) or cls
-    cls_args: tuple[Any, ...] = get_args(cls) or tuple()
+    cls_args: tuple[Any, ...] | None = get_args(cls) or None
 
     # `list[A]`
     if cls_origin is list:
-        assert len(cls_args) == 1
+        assert cls_args is not None and len(cls_args) == 1
         assert isinstance(data, list)
         item_cls = cls_args[0]
         return [default_decode(item_cls, x) for x in data]  # type: ignore[return-value]
@@ -132,8 +139,8 @@ def default_decode(cls: type[T], data: PlainData) -> T:
 
     # `dict[K, V]`
     if cls_origin is dict:
-        assert len(cls_args) == 2, "dict requires precisely two arguments"
-        key_cls, value_cls = cls_args
+        assert cls_args is not None and len(cls_args) == 2, "dict requires precisely two arguments"
+        key_cls, value_cls = cls_args[0], cls_args[1]
 
         # `dict[str, V]`
         if key_cls is str:
@@ -150,9 +157,11 @@ def default_decode(cls: type[T], data: PlainData) -> T:
     # `types.UnionType[...]`
     # TODO: If `name` matches multiple `cls_arg`, then an error must be raised for being ambigious
     if cls_origin is UnionType:
+        assert cls_args is not None
         assert isinstance(data, list)
         name, subdata = data
         for cls_arg in cls_args:
+            assert isinstance(cls_args, type)
             if name == (get_origin(cls_arg) or cls_arg).__name__:
                 return default_decode(cls_arg, subdata)
         msg = f"Expected type '{name}' to match '{cls}'"
@@ -160,8 +169,8 @@ def default_decode(cls: type[T], data: PlainData) -> T:
 
     # `typing.Literal[...]`
     if cls_origin is Literal:
-        assert data in cls_args
-        return data  # type: ignore[return-value]
+        msg = f"Expected any of {cls_args}, but got '{data}'"
+        raise DecodingError(msg)
 
     # `timedelta`
     if cls_origin is timedelta:

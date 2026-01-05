@@ -1,6 +1,7 @@
 from datetime import timedelta
 from typing import Any
 
+from bench.serialization import PlainData
 from bench.templates import Metric
 
 
@@ -37,6 +38,10 @@ class Table(Metric[dict[str, Any]]):
     def __init__(self, title: str | None = None) -> None:
         self.title = title
 
+    @classmethod
+    def encode_value(cls, value: dict[str, Any]) -> PlainData:
+        return {key: str(value) for key, value in value.items()}
+
 
 class Time(Metric[dict[str, timedelta]]):
     """Metric for timing information.
@@ -69,6 +74,10 @@ class Time(Metric[dict[str, timedelta]]):
 
     def __init__(self, title: str | None = None):
         self.title = title
+
+    @classmethod
+    def encode_value(cls, value: dict[str, timedelta]) -> PlainData:
+        return {key: t.total_seconds() for key, t in value.items()}
 
 
 class Graph(Metric[tuple[list[float], list[float]]]):
@@ -118,3 +127,8 @@ class Graph(Metric[tuple[list[float], list[float]]]):
         self.xlabel = xlabel
         self.ylabel = ylabel
         self.option_avg_std = option_avg_std
+
+    @classmethod
+    def encode_value(cls, value: tuple[list[float], list[float]]) -> PlainData:
+        xs, ys = value
+        return {"xs": xs, "ys": ys}

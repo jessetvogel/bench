@@ -1,7 +1,7 @@
 import random
 import secrets
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -12,7 +12,8 @@ from bench.templates import Param
 
 @pytest.fixture
 def engine() -> Engine:
-    path = Path(main.__file__)
+    main_file = cast(str, main.__file__)
+    path = Path(main_file)
     return Engine(path)
 
 

@@ -57,12 +57,12 @@ def _ansi2html_get_style():
                 r = (rr * 40 + 55) if rr else 0
                 g = (gg * 40 + 55) if gg else 0
                 b = (bb * 40 + 55) if bb else 0
-                indexed_style["%s" % i] = "".join("%02X" % c if 0 <= c <= 255 else None for c in (r, g, b))
+                indexed_style["%s" % i] = "".join(f"{c:02X}" if 0 <= c <= 255 else "" for c in (r, g, b))
 
     for g in range(24):
         i = g + 232
         lll = g * 10 + 8
-        indexed_style["%s" % i] = "".join("%02X" % c if 0 <= c <= 255 else None for c in (lll, lll, lll))
+        indexed_style["%s" % i] = "".join(f"{c:02X}" if 0 <= c <= 255 else "" for c in (lll, lll, lll))
 
     _ANSI2HTML_STYLES["style"] = (regular_style, bold_style, indexed_style)
     return _ANSI2HTML_STYLES["style"]

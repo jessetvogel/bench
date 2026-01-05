@@ -7,7 +7,7 @@ name = "bench"
 version = "0.0.1"
 description = "Bench is a Python framework for benchmarking"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 keywords = []
 authors = [{ name = "Jesse Vogel", email = "jesse.t.vogel@gmail.com" }]
@@ -24,7 +24,7 @@ dependencies = ["slash @ git+https://github.com/jessetvogel/slash.git@main"]
 [project.optional-dependencies]
 dev = [
     "ruff",
-    "mypy",
+    "ty",
     "pytest",
     "sphinx~=8.2.3",            # update when `sphinx_rtd_theme` supports Sphinx 9
     "sphinx-autodoc-typehints",

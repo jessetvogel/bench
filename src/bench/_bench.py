@@ -7,7 +7,9 @@ from bench.templates import Method, PlainResult, Result, Task, Token
 
 _LOGGER = get_logger("bench")
 
-T = TypeVar("T", bound=type)
+T = TypeVar("T", bound=type[Task])
+M = TypeVar("M", bound=type[Method])
+R = TypeVar("R", bound=type[Result])
 
 
 class Bench:
@@ -38,7 +40,7 @@ class Bench:
         self._task_types.append(task_type)
         return task_type
 
-    def method(self, method_type: T) -> T:
+    def method(self, method_type: M) -> M:
         """Add user-defined method type to the benchmark.
 
         Args:
@@ -48,7 +50,7 @@ class Bench:
         self._method_types.append(method_type)
         return method_type
 
-    def result(self, result_type: T) -> T:
+    def result(self, result_type: R) -> R:
         """Add user-defined result type to the benchmark.
 
         Args:
@@ -178,7 +180,7 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None
             if cons_param.kind == cons_param.VAR_POSITIONAL:
                 msg = (
                     f"Class `{user_type.__name__}` has variable-length positional parameter '{cons_param.name}' "
-                    f"in constructor `{constructor.__qualname__}`, which is not allowed"
+                    f"in constructor `{constructor.__qualname__}`, which is not allowed"  # ty: ignore[unresolved-attribute]
                 )
                 raise ValueError(msg)
             # Constructor parameter should appear in `type_params`
@@ -186,7 +188,7 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None
             if type_param is None:
                 msg = (
                     f"Missing parameter '{cons_param.name}' in `{user_type.__name__}.type_params()`, "
-                    f"as expected by constructor `{constructor.__qualname__}`"
+                    f"as expected by constructor `{constructor.__qualname__}`"  # ty: ignore[unresolved-attribute]
                 )
                 raise ValueError(msg)
             # Type hint for constructor parameter should match type of `type_param`
@@ -199,7 +201,7 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None
                     cons_param.name,
                     user_type.__name__,
                     type_param.type.__name__,
-                    constructor.__qualname__,
+                    constructor.__qualname__,  # ty: ignore[unresolved-attribute]
                     type_hint.__name__,
                 )
         # Type parameters should appear in `cons_params` (if no variable-length keyword parameter)
@@ -209,6 +211,6 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None
             ):
                 msg = (
                     f"Parameter '{type_param.name}' in `{user_type.__name__}.type_params()` "
-                    f"does not match any parameter of constructor `{constructor.__qualname__}`"
+                    f"does not match any parameter of constructor `{constructor.__qualname__}`"  # ty: ignore[unresolved-attribute]
                 )
                 raise ValueError(msg)
