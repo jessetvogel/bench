@@ -8,12 +8,12 @@ from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_ar
 from bench._logging import get_logger
 from bench.serialization import PlainData, Serializable, is_plain_data
 
-T = TypeVar("T", bound=int | float | str)
+P = TypeVar("P", bound=int | float | str)
 
 _LOGGER = get_logger("bench")
 
 
-class Param(Generic[T]):
+class Param(Generic[P]):
     """Class containing information about a parameter.
 
     Args:
@@ -27,10 +27,10 @@ class Param(Generic[T]):
     def __init__(
         self,
         name: str,
-        type: type[T],  # ty: ignore[invalid-type-form]
+        type: type[P],  # ty: ignore[invalid-type-form]
         *,
-        options: list[T] | None = None,
-        default: T | None = None,
+        options: list[P] | None = None,
+        default: P | None = None,
         description: str | None = None,
     ) -> None:
         self._name = name
@@ -44,15 +44,15 @@ class Param(Generic[T]):
         return self._name
 
     @property
-    def type(self) -> type[T]:  # ty: ignore[invalid-type-form]
+    def type(self) -> type[P]:  # ty: ignore[invalid-type-form]
         return self._type
 
     @property
-    def options(self) -> list[T] | None:
+    def options(self) -> list[P] | None:
         return self._options
 
     @property
-    def default(self) -> T | None:
+    def default(self) -> P | None:
         return self._default
 
     @property
@@ -254,15 +254,15 @@ class Token(Serializable):
         return cls(data)
 
 
-MT = TypeVar("MT", bound=Task)
-MR = TypeVar("MR", bound=Result)
-MV = TypeVar("MV")
+T = TypeVar("T", bound=Task)
+R = TypeVar("R", bound=Result)
+V = TypeVar("V")
 
 
-class Metric(Generic[MV]):
+class Metric(Generic[V]):
     """Base class for a metric."""
 
-    def __call__(self, f: Callable[[MT, MR], MV]) -> Callable[[MT, MR], MV]:
+    def __call__(self, f: Callable[[T, R], V]) -> Callable[[T, R], V]:
         """Bound the metric to a task method."""
         if hasattr(self, "_task_method"):
             msg = "Metric instance is already bound to a task method"
@@ -272,7 +272,7 @@ class Metric(Generic[MV]):
         setattr(f, "_metric", self)
         return f
 
-    def evaluate(self, task: Task, result: Result) -> MV:
+    def evaluate(self, task: Task, result: Result) -> V:
         """Evaluate the metric on the given task and result."""
         self._check_has_task_method()
         self._check_result_matches_type_hint(result)
@@ -286,7 +286,7 @@ class Metric(Generic[MV]):
 
     @classmethod
     @abstractmethod
-    def encode_value(cls, value: MV) -> PlainData: ...
+    def encode_value(cls, value: V) -> PlainData: ...
 
     def _check_has_task_method(self) -> None:
         # Check that metric has an associated function
@@ -294,7 +294,7 @@ class Metric(Generic[MV]):
             msg = "Metric instance is not yet bound to a task method"
             raise RuntimeError(msg)
 
-    def _validate_task_method(self, f: Callable[[MT, MR], MV]) -> None:
+    def _validate_task_method(self, f: Callable[[T, R], V]) -> None:
         # Check that `f` has two parameters
         f_params = list(inspect.signature(f).parameters)
         if len(f_params) != 2:

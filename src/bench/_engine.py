@@ -13,7 +13,7 @@ from bench._logging import get_logger
 from bench._process import Process
 from bench._utils import to_hash
 from bench.serialization import check_serializable
-from bench.templates import MV, Method, Metric, Result, Task, Token
+from bench.templates import Method, Metric, Result, Task, Token, V
 
 
 class Engine:
@@ -127,7 +127,7 @@ class Engine:
 
         return run
 
-    def evaluate_metric(self, metric: Metric[MV], run: Run) -> MV:
+    def evaluate_metric(self, metric: Metric[V], run: Run) -> V:
         # Check that run has status 'done'
         if not isinstance(run.result, Result):
             msg = f"Expected run with status 'done', but got {run.status}"
