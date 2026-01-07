@@ -75,12 +75,13 @@ def main_run() -> int:
         return 1
 
     # Execute runs
-    for it in range(num_runs):
-        logger.info(f"Executing run {it + 1}/{num_runs} ..")
-        run = engine.execute_run(task, method)
-        # If run failed, stop
-        if run is None:
-            return 1
+    try:
+        for it in range(num_runs):
+            logger.info(f"Executing run {it + 1}/{num_runs} ..")
+            engine.execute_run(task, method)
+    except Exception:
+        logger.exception("Run failed due to the following error:")
+        return 1
 
     # Shutdown engine
     engine.shutdown()

@@ -161,7 +161,7 @@ def default_decode(cls: type[T], data: PlainData) -> T:
         assert isinstance(data, list)
         name, subdata = data
         for cls_arg in cls_args:
-            assert isinstance(cls_args, type)
+            assert isinstance(cls_arg, type)
             if name == (get_origin(cls_arg) or cls_arg).__name__:
                 return default_decode(cls_arg, subdata)
         msg = f"Expected type '{name}' to match '{cls}'"
@@ -350,10 +350,18 @@ def check_serializable(object: Serializable) -> None:
     try:
         encoded = object.encode()
     except Exception as err:
-        msg = f"Exception occurred during encoding '{cls.__name__}'"
+        msg = f"Exception occurred during encoding `{cls.__name__}`"
         raise EncodingError(msg) from err
+    if not is_plain_data(encoded):
+        msg = f"Encoding of `{cls.__name__}` did not produce plain data"
+        raise TypeError(msg)
     try:
-        cls.decode(encoded)
+        decoded = cls.decode(encoded)
     except Exception as err:
-        msg = f"Exception occurred during decoding '{cls.__name__}'"
+        msg = f"Exception occurred during decoding `{cls.__name__}`"
         raise DecodingError(msg) from err
+    try:
+        assert decoded.encode() == encoded
+    except Exception as err:
+        msg = f"Second encoding of `{type(decoded).__name__}` does not match first encoding"
+        raise AssertionError(msg) from err

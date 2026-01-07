@@ -66,6 +66,32 @@ class Engine:
         self.cache.insert_method(method)
         return method
 
+    def execute_run(self, task: Task, method: Method) -> Run:
+        """Execute run from task and method.
+
+        Args:
+            task: Task to execute.
+            method: Method to apply to task.
+        """
+        if (run_handler := self._bench.run_handler) is None:
+            msg = "No run handler was registered. Use the `run` method to register a handler."
+            raise RuntimeError(msg)
+
+        # Perform task with method
+        result = run_handler(task, method)
+
+        # Create and store run from result
+        self.cache.insert_or_update_run(
+            run := Run(
+                id=secrets.token_hex(8),
+                task_id=to_hash(task),
+                method_id=to_hash(method),
+                result=result,
+            )
+        )
+
+        return run
+
     def execute_run_in_process(self, task: Task, method: Method, *, num_runs: int = 1) -> None:
         """Launch new process to execute a run based on the given task and method.
 
@@ -96,36 +122,6 @@ class Engine:
                 created_at=datetime.now(),
             )
         )
-
-    def execute_run(self, task: Task, method: Method) -> Run | None:
-        """Execute run from task and method.
-
-        Args:
-            task: Task to execute.
-            method: Method to apply to task.
-        """
-        if (run_handler := self._bench.run_handler) is None:
-            msg = "No run handler was registered. Use the `run` method to register a handler."
-            raise RuntimeError(msg)
-
-        # Perform task with method
-        try:
-            result = run_handler(task, method)
-        except Exception:
-            self._logger.exception("Run failed due to the following error:")
-            return None
-
-        # Create and store run from result
-        self.cache.insert_or_update_run(
-            run := Run(
-                id=secrets.token_hex(8),
-                task_id=to_hash(task),
-                method_id=to_hash(method),
-                result=result,
-            )
-        )
-
-        return run
 
     def evaluate_metric(self, metric: Metric[V], run: Run) -> V:
         # Check that run has status 'done'
