@@ -33,10 +33,21 @@ class Table(Metric[dict[str, Any]]):
 
     Args:
         title: Title of the table.
+        first_column_label: Label of the first column.
+        transposed: If :py:const:`True`, the table is transposed, that is,
+            the methods are shown as columns rather than rows.
     """
 
-    def __init__(self, title: str | None = None) -> None:
+    def __init__(
+        self,
+        title: str | None = None,
+        *,
+        first_column_label: str = "",
+        transposed: bool = False,
+    ) -> None:
         self.title = title
+        self.first_column_label = first_column_label
+        self.transposed = transposed
 
     @classmethod
     def encode_value(cls, value: dict[str, Any]) -> PlainData:

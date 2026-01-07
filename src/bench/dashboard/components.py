@@ -463,38 +463,10 @@ class PageTask(Div):
 
         selected_method_ids = set(group.method_id for group in self._selected_groups())
         for method_id, group in self._groups.items():
-            # Construct method label and parameter description
-            try:
-                method = self._engine.cache.select_method(method_id)
-                method_label = method.label()
-                method_params_description = ", ".join(
-                    [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.type_params()]
-                )
-            except Exception as err:
-                Session.require().log(
-                    f"Failed to get method with ID {group.method_id}",
-                    details=Pre(Code(str(err))),
-                    level="error",
-                )
-                method_label = "?"
-                method_params_description = ""
             # Checkbox row of the form:
             # [x] <method label> <num runs> <method params description>
             checkbox = Checkbox(
-                Span(
-                    Span(method_label).style(
-                        {
-                            "background-color": group.color,
-                            "color": "var(--white)",
-                            "padding": "3px 6px",
-                            "border-radius": "4px",
-                        }
-                    ),
-                    " ",
-                    Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
-                    " ",
-                    Span(method_params_description).style({"color": "var(--gray)", "font-size": "12px"}),
-                ),
+                group_badge(self._engine, group, show_runs=True, show_description=True),
                 checked=method_id in selected_method_ids,  # checked if group was already selected
                 disabled=not group.runs_done,  # disabled if no runs
             ).onclick(handle_click_checkbox)
@@ -502,28 +474,13 @@ class PageTask(Div):
             self._column_checkboxes.append(checkbox)
 
     async def _delete_selected_runs(self) -> None:
-        # TODO: Clean up this method .. Contains duplicate code I think
         selected_groups = self._selected_groups()
         msg = Column(
             Span("Are you sure you want to delete the following runs?").style({"font-weight": "bold"}),
             Span("This action can not be undone!"),
-            Column(
-                [
-                    Span(
-                        Span(self._engine.cache.select_method(group.method_id).label()).style(
-                            {
-                                "background-color": group.color,
-                                "color": "var(--white)",
-                                "padding": "3px 6px",
-                                "border-radius": "4px",
-                            }
-                        ),
-                        " ",
-                        Span(f"({len(group.runs_done)} runs)").style({"color": "var(--gray)"}),
-                    )
-                    for group in selected_groups
-                ]
-            ).style({"gap": "12px", "padding": "8px"}),
+            Column([group_badge(self._engine, group, show_runs=True) for group in selected_groups]).style(
+                {"gap": "12px", "padding": "8px"}
+            ),
         ).style({"gap": "12px"})
         if await confirm(msg, ok_text="Yes"):
             runs = [run for group in selected_groups for run in group.runs]
@@ -625,7 +582,7 @@ class TimeElem(Panel):
             )
             .append(Div())
             .append([Div(key).style({"font-style": "italic"}) for key in keys])
-            .append(*[[circle(group.color), *[Div(datum[key]) for key in keys]] for group, datum in zip(groups, data)])
+            .append(*[[group_circle(group), *[Div(datum[key]) for key in keys]] for group, datum in zip(groups, data)])
         )
 
 
@@ -731,23 +688,39 @@ class TableElem(Div):
     def _setup(self) -> None:
         groups = self._selected_groups()
 
-        # Compute data
-        keys: list[str] = ["Method"]
-        data: list[dict[str, Any]] = []
+        # Create UI
+        self.clear()
+        self.style({"display": "none" if len(groups) == 0 else None})
+        self.append(self._data_table_transposed(groups) if self._table.transposed else self._data_table(groups))
 
+    def _data_table(self, groups: list[RunGroup]) -> SlashDataTable:
+        keys: list[str] = [self._table.first_column_label]
+        data: list[dict[str, Any]] = []
         for group in groups:
             for run in group.runs_done:
                 datum = self._engine.evaluate_metric(self._table, run)
-                datum["Method"] = circle(group.color).style({"margin": "auto"})
+                datum[self._table.first_column_label] = group_badge(self._engine, group)
                 for key in datum:
                     if key not in keys:
                         keys.append(key)
                 data.append(datum)
+        return SlashDataTable(keys).set_data(data)
 
-        # Create UI
-        self.clear()
-        self.style({"display": "none" if len(groups) == 0 else None})
-        self.append(SlashDataTable(keys).set_data(data))
+    def _data_table_transposed(self, groups: list[RunGroup]) -> SlashDataTable:
+        keys: list[str] = [self._table.first_column_label]  # + [...]
+        labels: dict[str, str | Elem] = {}
+        data: dict[str, dict[str, Any]] = {}
+        for group in groups:
+            for run in group.runs_done:
+                method_key = str(len(keys))  # unique ID in case multiple method labels coincide
+                keys.append(method_key)
+                labels[method_key] = group_badge(self._engine, group).style({"border": "1px solid #0005"})
+                datum = self._engine.evaluate_metric(self._table, run)
+                for key, value in datum.items():
+                    if key not in data:
+                        data[key] = {self._table.first_column_label: key}
+                    data[key][method_key] = value
+        return SlashDataTable(keys, labels=labels).set_data(list(data.values()))
 
 
 class DialogNewRun(Dialog):
@@ -879,5 +852,45 @@ def action_button(*children: Children) -> Button:
     )
 
 
-def circle(color: str) -> Div:
-    return Div().style({"width": "24px", "height": "24px", "border-radius": "12px", "background-color": color})
+def group_circle(group: RunGroup) -> Div:
+    return Div().style({"width": "24px", "height": "24px", "border-radius": "12px", "background-color": group.color})
+
+
+def group_badge(engine: Engine, group: RunGroup, *, show_runs: bool = False, show_description: bool = False) -> Span:
+    try:
+        method = engine.cache.select_method(group.method_id)
+        method_label = method.label()
+        method_params_description = ", ".join(
+            [f"{param.name} = {getattr(method, param.name, '?')}" for param in method.type_params()]
+        )
+    except Exception as err:
+        Session.require().log(
+            f"Failed to get method with ID {group.method_id}",
+            details=Pre(Code(str(err))),
+            level="error",
+        )
+        method_label = "?"
+        method_params_description = ""
+
+    spans: list[Span] = []
+    spans.append(
+        Span(method_label).style(
+            {
+                "background-color": group.color,
+                "color": "var(--white)",
+                "padding": "3px 6px",
+                "border-radius": "4px",
+            }
+        )
+    )
+
+    if show_runs:
+        spans.append(Span(f" ({len(group.runs_done)} runs)").style({"color": "var(--gray)"}))
+
+    if show_description:
+        spans.append(Span(" " + method_params_description).style({"color": "var(--gray)", "font-size": "12px"}))
+
+    if len(spans) == 1:
+        return spans[0]
+
+    return Span(*spans)
