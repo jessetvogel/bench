@@ -79,6 +79,7 @@ class Engine:
 
         # Perform task with method
         result = run_handler(task, method)
+        check_serializable(result)
 
         # Create and store run from result
         self.cache.insert_or_update_run(
