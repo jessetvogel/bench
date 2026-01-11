@@ -123,7 +123,7 @@ class NewtonSolver(Method):
 
 
 @bench.run
-def run(task: Cubic, method: RandomSolver) -> PlainResult:
+def run(task: Cubic, method: RandomSolver | NewtonSolver) -> PlainResult:
     start_time = time.perf_counter()
     result = method.find_root(task)
     end_time = time.perf_counter()
