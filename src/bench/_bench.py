@@ -3,6 +3,7 @@ from collections.abc import Callable, Iterable
 from typing import TypeVar, get_type_hints
 
 from bench._logging import get_logger
+from bench._utils import TypedFunction
 from bench.templates import Method, PlainResult, Result, Task, Token
 
 _LOGGER = get_logger("bench")
@@ -69,8 +70,7 @@ class Bench:
                 Otherwise, a :py:class:`Token` instance is returned, which can be used
                 to obtain the result at a later time using :py:meth:`poll`.
         """
-        # TODO: validate handler
-        self._run_handler = handler
+        self._run_handler = TypedFunction(handler, param_types=(Task, Method), return_type=Result)
 
     def poll(self, handler: Callable[[Token], Result | None]) -> None:
         """Set handler for polling a result.
@@ -80,8 +80,8 @@ class Bench:
                 This function should return a :py:class:`Result` instance if the task
                 is completed, and :py:const:`None` otherwise.
         """
-        # TODO: validate handler
-        self._poll_handler = handler
+        raise NotImplementedError("Polling functionality to be implemented")
+        # self._poll_handler = TypedFunction(handler, param_types=(Token), return_type=Result)
 
     @property
     def run_handler(self) -> Callable[[Task, Method], Result | Token] | None:
@@ -91,7 +91,8 @@ class Bench:
     @property
     def poll_handler(self) -> Callable[[Token], Result | None] | None:
         """Get user-defined poll handler set by :py:meth:`poll`."""
-        return self._poll_handler
+        raise NotImplementedError("Polling functionality to be implemented")
+        # return self._poll_handler
 
     @property
     def name(self) -> str:

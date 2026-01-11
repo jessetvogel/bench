@@ -123,10 +123,7 @@ class NewtonSolver(Method):
 
 
 @bench.run
-def run(task: Task, method: Method) -> PlainResult:
-    assert isinstance(task, Cubic)
-    assert isinstance(method, (RandomSolver, NewtonSolver))
-
+def run(task: Cubic, method: RandomSolver) -> PlainResult:
     start_time = time.perf_counter()
     result = method.find_root(task)
     end_time = time.perf_counter()
