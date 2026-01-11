@@ -12,11 +12,11 @@ from bench._components import ExecutionProcess, Run, to_hash
 from bench._logging import get_logger
 from bench._process import Process
 from bench.serialization import check_serializable
-from bench.templates import Method, Metric, Result, Task, Token, V
+from bench.templates import Method, Metric, Result, Task, V
 
 
 class Engine:
-    """Engine / API
+    """Class with all functional API methods.
 
     Args:
         path: Path to Python module containing :py:class:`Bench` instance.
@@ -143,23 +143,6 @@ class Engine:
 
     def delete_runs(self, runs: Iterable[Run]) -> None:
         self.cache.delete_runs(list(runs))
-
-    def execute_poll(self, token: Token) -> Result | None:
-        if (poll_handler := self._bench.poll_handler) is None:
-            msg = "No poll handler was registered. Use the `Bench.poll` method to register a handler."
-            raise RuntimeError(msg)
-
-        # Perform task with method
-        result: Result | None = None
-        try:
-            result = poll_handler(token)
-        except Exception:
-            self._logger.exception("Poll failed due to the following error:")
-            return None
-
-        # TODO: Finish this function
-        result = result
-        return None
 
     def shutdown(self) -> None:
         self.cache.shutdown()

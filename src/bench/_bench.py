@@ -4,7 +4,7 @@ from typing import TypeVar, get_type_hints
 
 from bench._logging import get_logger
 from bench._utils import TypedFunction
-from bench.templates import Method, PlainResult, Result, Task, Token
+from bench.templates import Method, PlainResult, Result, Task
 
 _LOGGER = get_logger("bench")
 
@@ -28,8 +28,7 @@ class Bench:
         self._task_types: list[type[Task]] = []
         self._method_types: list[type[Method]] = []
         self._result_types: list[type[Result]] = [PlainResult]
-        self._run_handler: Callable[[Task, Method], Result | Token] | None = None
-        self._poll_handler: Callable[[Token], Result | None] | None = None
+        self._run_handler: Callable[[Task, Method], Result] | None = None
 
     def task(self, task_type: TaskType) -> TaskType:
         """Add user-defined task type to the benchmark.
@@ -61,38 +60,19 @@ class Bench:
         self._result_types.append(result_type)
         return result_type
 
-    def run(self, handler: Callable[[Task, Method], Result | Token]) -> None:
+    def run(self, handler: Callable[[Task, Method], Result]) -> None:
         """Set handler for executing tasks with a method.
 
         Args:
-            handler: Function that executes a task with a method. The function should return
-                a :py:class:`Result` instance if the task can be completed at once.
-                Otherwise, a :py:class:`Token` instance is returned, which can be used
-                to obtain the result at a later time using :py:meth:`poll`.
+            handler: Function that executes a task with a method, which returns
+                a :py:class:`Result` instance.
         """
         self._run_handler = TypedFunction(handler, param_types=(Task, Method), return_type=Result)
 
-    def poll(self, handler: Callable[[Token], Result | None]) -> None:
-        """Set handler for polling a result.
-
-        Args:
-            handler: Function that checks if the execution of the task is completed.
-                This function should return a :py:class:`Result` instance if the task
-                is completed, and :py:const:`None` otherwise.
-        """
-        raise NotImplementedError("Polling functionality to be implemented")
-        # self._poll_handler = TypedFunction(handler, param_types=(Token), return_type=Result)
-
     @property
-    def run_handler(self) -> Callable[[Task, Method], Result | Token] | None:
+    def run_handler(self) -> Callable[[Task, Method], Result] | None:
         """Get user-defined run handler set by :py:meth:`run`."""
         return self._run_handler
-
-    @property
-    def poll_handler(self) -> Callable[[Token], Result | None] | None:
-        """Get user-defined poll handler set by :py:meth:`poll`."""
-        raise NotImplementedError("Polling functionality to be implemented")
-        # return self._poll_handler
 
     @property
     def name(self) -> str:

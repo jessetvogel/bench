@@ -21,7 +21,7 @@ which are decorated by a :py:class:`~bench.templates.Metric` instance.
 
 **Example**
 
-Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Implement your own task type :py:class:`MyTask` and method type :py:class:`MyMethod`, and add them to the :py:class:`Bench` instance. Finally, implement a function for how to execute an instance of your task using an instance of your method.
+Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Implement your own task type :py:class:`MyTask`, method type :py:class:`MyMethod` and result type :py:class:`MyResult`, and add them to the :py:class:`Bench` instance. Finally, implement a function :py:meth:`run` to execute an instance of your task using an instance of your method.
 
 .. code-block:: python
 
@@ -36,10 +36,12 @@ Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Imp
     @bench.method
     class MyMethod(Method): ...
 
-    # Function for how to execute task using method
-    @bench.set_run
-    def run(task: MyTask, method: MyMethod) -> Result:
+    @bench.result
+    class MyResult(Result): ...
+
+    @bench.run
+    def run(task: MyTask, method: MyMethod) -> MyResult:
         # < your logic >
-        return Result(...)
+        return MyResult(...)
 
 Run the command ``bench-dashboard my_benchmark.py`` to start the benchmark dashboard.

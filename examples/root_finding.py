@@ -123,9 +123,9 @@ class NewtonSolver(Method):
 
 
 @bench.run
-def run(task: Cubic, method: RandomSolver | NewtonSolver) -> PlainResult:
+def run(cubic: Cubic, solver: RandomSolver | NewtonSolver) -> PlainResult:
     start_time = time.perf_counter()
-    result = method.find_root(task)
+    result = solver.find_root(cubic)
     end_time = time.perf_counter()
     result["seconds"] = end_time - start_time
     return result

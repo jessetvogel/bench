@@ -15,7 +15,6 @@ First, we must define what a *task* is. In this example, we will consider only o
     from bench.serialization import PlainData
 
     class Cubic(Task):
-
         def __init__(self, a: float, b: float, c: float, d: float) -> None:
             self.a, self.b, self.c, self.d = a, b, c, d
 
@@ -36,11 +35,11 @@ First, we must define what a *task* is. In this example, we will consider only o
         # The following two methods define metrics that are derived from
         # the result of a task.
         @Time()
-        def time(self, result: Result) -> dict[str, timedelta]:
+        def time(self, result: PlainResult) -> dict[str, timedelta]:
             return {"time": timedelta(seconds=result["seconds"])}
 
         @Table()
-        def table(self, result: Result) -> dict[str, Any]:
+        def table(self, result: PlainResult) -> dict[str, Any]:
             x = result["x"]
             y = self.f(x)
             return {
@@ -101,7 +100,7 @@ Next, we need to define what a *method* is. In this example, we will implement t
 
         # Method to find a root of a cubic using 1,000 iterations of Newton's
         # method, where derivatives are estimated using finite differences.
-        def find_root(self, cubic: Cubic) -> Result:
+        def find_root(self, cubic: Cubic) -> PlainResult:
             num_iters = 1_000
             num_evals = 0
             x = self.x_0
@@ -112,7 +111,7 @@ Next, we need to define what a *method* is. In this example, we will implement t
                     break
                 x -= cubic.f(x) / df
                 num_evals += 1
-            return Result(x=x, num_evals=num_evals)
+            return PlainResult(x=x, num_evals=num_evals)
 
 Create a file ``root_finding.py`` with the following contents.
 
@@ -121,7 +120,7 @@ Create a file ``root_finding.py`` with the following contents.
     import time
     
     from bench import Bench
-    from bench.templates import Task, Method, Result
+    from bench.templates import PlainResult
 
     # .. define or import `Cubic`, `RandomSolver`, `NewtonSolver` ..
 
@@ -135,12 +134,9 @@ Create a file ``root_finding.py`` with the following contents.
 
     # Define a callback function for executing a task with a method
     @bench.run
-    def run(task: Task, method: Method) -> Result:
-        assert isinstance(task, Cubic)
-        assert isinstance(method, RandomSolver | NewtonSolver)
-
+    def run(cubic: Cubic, solver: RandomSolver | NewtonSolver) -> PlainResult:
         start_time = time.perf_counter()
-        result = method.find_root(task)
+        result = solver.find_root(cubic)
         end_time = time.perf_counter()
         result["seconds"] = end_time - start_time
         return result
