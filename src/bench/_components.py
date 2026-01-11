@@ -1,3 +1,5 @@
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -55,3 +57,12 @@ class ExecutionProcess:
     @property
     def id(self) -> str:
         return str(self.created_at)
+
+
+def to_hash(object: Task | Method) -> str:
+    if not hasattr(object, "_hash"):
+        m = hashlib.sha256()
+        m.update(object.type_label().encode())
+        m.update(json.dumps(object.encode(), sort_keys=True, ensure_ascii=True).encode())
+        setattr(object, "_hash", m.hexdigest()[:8])
+    return getattr(object, "_hash")

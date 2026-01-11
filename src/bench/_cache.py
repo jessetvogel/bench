@@ -5,9 +5,8 @@ import sqlite3
 from pathlib import Path
 
 from bench import Bench
-from bench._components import Run
+from bench._components import Run, to_hash
 from bench._logging import GRAY, RESET, WHITE, get_logger
-from bench._utils import to_hash
 from bench.serialization import from_json, to_json
 from bench.templates import Method, Result, Task, Token
 

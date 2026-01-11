@@ -8,10 +8,9 @@ from typing import Any, Iterable, cast
 
 from bench import Bench
 from bench._cache import Cache
-from bench._components import ExecutionProcess, Run
+from bench._components import ExecutionProcess, Run, to_hash
 from bench._logging import get_logger
 from bench._process import Process
-from bench._utils import to_hash
 from bench.serialization import check_serializable
 from bench.templates import Method, Metric, Result, Task, Token, V
 

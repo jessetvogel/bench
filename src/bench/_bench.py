@@ -7,9 +7,9 @@ from bench.templates import Method, PlainResult, Result, Task, Token
 
 _LOGGER = get_logger("bench")
 
-T = TypeVar("T", bound=type[Task])
-M = TypeVar("M", bound=type[Method])
-R = TypeVar("R", bound=type[Result])
+TaskType = TypeVar("TaskType", bound=type[Task])
+MethodType = TypeVar("MethodType", bound=type[Method])
+ResultType = TypeVar("ResultType", bound=type[Result])
 
 
 class Bench:
@@ -30,7 +30,7 @@ class Bench:
         self._run_handler: Callable[[Task, Method], Result | Token] | None = None
         self._poll_handler: Callable[[Token], Result | None] | None = None
 
-    def task(self, task_type: T) -> T:
+    def task(self, task_type: TaskType) -> TaskType:
         """Add user-defined task type to the benchmark.
 
         Args:
@@ -40,7 +40,7 @@ class Bench:
         self._task_types.append(task_type)
         return task_type
 
-    def method(self, method_type: M) -> M:
+    def method(self, method_type: MethodType) -> MethodType:
         """Add user-defined method type to the benchmark.
 
         Args:
@@ -50,7 +50,7 @@ class Bench:
         self._method_types.append(method_type)
         return method_type
 
-    def result(self, result_type: R) -> R:
+    def result(self, result_type: ResultType) -> ResultType:
         """Add user-defined result type to the benchmark.
 
         Args:

@@ -3,14 +3,12 @@ from __future__ import annotations
 import inspect
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Annotated, Any, Generic, Literal, Self, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import Annotated, Any, Generic, Literal, Self, TypeVar, get_args, get_origin, get_type_hints
 
-from bench._logging import get_logger
+from bench._utils import TypedFunction
 from bench.serialization import PlainData, Serializable, is_plain_data
 
 P = TypeVar("P", bound=int | float | str)
-
-_LOGGER = get_logger("bench")
 
 
 class Param(Generic[P]):
@@ -262,64 +260,32 @@ V = TypeVar("V")
 class Metric(Generic[V]):
     """Base class for a metric."""
 
-    def __call__(self, f: Callable[[T, R], V]) -> Callable[[T, R], V]:
-        """Bound the metric to a task method."""
+    def __call__(self, task_method: Callable[[T, R], V]) -> Callable[[T, R], V]:
+        """Bound task method to the metric."""
         if hasattr(self, "_task_method"):
             msg = "Metric instance is already bound to a task method"
             raise RuntimeError(msg)
-        self._validate_task_method(f)
-        self._task_method = f
-        setattr(f, "_metric", self)
-        return f
+
+        self._task_method = TypedFunction(task_method, param_types=(Task, Result), return_type=None)
+        setattr(task_method, "_metric", self)
+        return task_method
 
     def evaluate(self, task: Task, result: Result) -> V:
         """Evaluate the metric on the given task and result."""
-        self._check_has_task_method()
-        self._check_result_matches_type_hint(result)
-        return self._task_method(cast(Any, task), cast(Any, result))
+        self._is_bound()
+        return self._task_method(task, result)
 
     @property
     def name(self) -> str:
         """Name of the method bound to the metric."""
-        self._check_has_task_method()
-        return self._task_method.__name__  # ty: ignore[possibly-missing-attribute]
+        self._is_bound()
+        return self._task_method.name
 
     @classmethod
     @abstractmethod
     def encode_value(cls, value: V) -> PlainData: ...
 
-    def _check_has_task_method(self) -> None:
-        # Check that metric has an associated function
+    def _is_bound(self) -> None:
         if not hasattr(self, "_task_method"):
             msg = "Metric instance is not yet bound to a task method"
             raise RuntimeError(msg)
-
-    def _validate_task_method(self, f: Callable[[T, R], V]) -> None:
-        # Check that `f` has two parameters
-        f_params = list(inspect.signature(f).parameters)
-        if len(f_params) != 2:
-            msg = f"Expected method with 2 arguments, but got {len(f_params)}"
-            raise ValueError(msg)
-        # Store type hint of result parameter of `f`
-        type_hint_result = cast(type | None, get_type_hints(f)[f_params[1]])
-        if type_hint_result is not None:
-            if not issubclass(type_hint_result, Result):
-                _LOGGER.warning(
-                    f"Metric method `{f.__qualname__}` has parameter with type hint "  # ty: ignore[unresolved-attribute]
-                    f"`{type_hint_result.__name__}`, but expected a `Result` type"
-                )
-                type_hint_result = None
-        self._type_hint_result = type_hint_result
-        self._has_warned = False
-
-    def _check_result_matches_type_hint(self, result: Result) -> None:
-        # Log warning if the type of the result does not match the type hint
-        if self._has_warned or self._type_hint_result is None:
-            return
-
-        if not isinstance(result, self._type_hint_result):
-            _LOGGER.warning(
-                f"Metric method `{self._task_method.__qualname__}` has result parameter with type hint "  # ty: ignore[possibly-missing-attribute]
-                f"`{self._type_hint_result.__name__}`, but is evaluated on result of type `{type(result).__name__}`"
-            )
-            self._has_warned = True  # warn at most once per metric
