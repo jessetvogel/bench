@@ -731,7 +731,11 @@ class DialogNewRun(Dialog):
         self._setup()
 
     def _setup(self) -> None:
-        self._method_types = {method_type.type_label(): method_type for method_type in self._engine.bench.method_types}
+        self._method_types = {
+            method_type.type_label(): method_type
+            for method_type in self._engine.bench.method_types
+            if method_type.type_supports(self._task)
+        }
         self.append(
             H3(f"New run for {self._task.label()}"),
             Div(

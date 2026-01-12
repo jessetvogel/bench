@@ -72,6 +72,10 @@ class Engine:
             task: Task to execute.
             method: Method to apply to task.
         """
+        if not method.type_supports(task):
+            msg = f"Method type `{method.type_label()}` does not support given task"
+            raise ValueError(msg)
+
         if (run_handler := self._bench.run_handler) is None:
             msg = "No run handler was registered. Use the `run` method to register a handler."
             raise RuntimeError(msg)

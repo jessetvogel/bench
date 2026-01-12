@@ -173,6 +173,11 @@ class Method(ABC, Serializable):
             return _params_default(cls.__init__)
         return _params_default(constructor)
 
+    @classmethod
+    def type_supports(cls, task: Task) -> bool:
+        """Returns whether the class of methods supports the given task."""
+        return True
+
     def label(self) -> str:
         """Display name of the method."""
         return self.type_label()
