@@ -79,8 +79,8 @@ def _params_default(constructor: Callable[..., Any]) -> list[Param]:
         default = param.default if param.default != param.empty else None
         # If annotation is `typing.Annotated[T, x]`, then interpret `x` as parameter description
         description: str | None = None
-        if get_origin(param.annotation) is Annotated:
-            annotation_args = get_args(param.annotation)
+        if get_origin(type_hint) is Annotated:
+            annotation_args = get_args(type_hint)
             if len(annotation_args) == 2:
                 description = str(annotation_args[1])
         # Create `Param` from obtained information

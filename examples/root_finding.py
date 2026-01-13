@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 import time
 from datetime import timedelta
-from typing import Any, Self
+from typing import Annotated, Any, Self
 
 from bench import Bench
 from bench.metrics import Table, Time
@@ -17,7 +17,7 @@ bench = Bench("Root finding")
 # Add task type to benchmark
 @bench.task
 class Cubic(Task):
-    def __init__(self, a: float, b: float, c: float, d: float) -> None:
+    def __init__(self, a: Annotated[float, "Parameter a"], b: float, c: float, d: float) -> None:
         self.a = a
         self.b = b
         self.c = c
@@ -65,7 +65,7 @@ class Cubic(Task):
 # Add method type to benchmark
 @bench.method
 class RandomSolver(Method):
-    def __init__(self, x_min: float = -10.0, x_max: float = +10.0) -> None:
+    def __init__(self, x_min: Annotated[float, "beschrijving"] = -10.0, x_max: float = +10.0) -> None:
         self.x_min = x_min
         self.x_max = x_max
 

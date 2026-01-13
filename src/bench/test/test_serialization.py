@@ -25,20 +25,20 @@ class A(Serializable):
     i: int = 1
     f: float = 2.0
     s: str = "3"
-    x: X = field(default_factory=lambda: X())  # type: ignore[abstract]
+    x: X = field(default_factory=lambda: X())
     li: list[int] = field(default_factory=lambda: [4, 5])
     ls: list[str] = field(default_factory=lambda: ["6", "7"])
     dsi: dict[str, int] = field(default_factory=lambda: {"8": 9, "10": 11})
     dff: dict[float, float] = field(default_factory=lambda: {12.0: 13.0, 14.0: 15.0})
-    u: X | None = field(default_factory=lambda: X())  # type: ignore[abstract]
-    lu: list[X | Y] = field(default_factory=lambda: [X(), Y()])  # type: ignore[abstract]
+    u: X | None = field(default_factory=lambda: X())
+    lu: list[X | Y] = field(default_factory=lambda: [X(), Y()])
     lit: Literal["a", "b", "c"] = "a"
     t: timedelta = field(default_factory=lambda: timedelta(days=1, seconds=2, microseconds=3))
 
 
 def test_default_serialization() -> None:
     """Test encoding and decoding provided by DefaultSerializable."""
-    a = A()  # type: ignore[abstract]
+    a = A()
     encoded = a.encode()
     print(encoded)
     assert A.decode(encoded) == a

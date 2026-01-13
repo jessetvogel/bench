@@ -5,7 +5,18 @@ import json
 from abc import update_abstractmethods
 from datetime import timedelta
 from types import UnionType
-from typing import Any, Literal, Protocol, Self, TypeAlias, TypeVar, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    Literal,
+    Protocol,
+    Self,
+    TypeAlias,
+    TypeVar,
+    cast,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 PlainData: TypeAlias = str | int | float | bool | None | list["PlainData"] | dict[str, "PlainData"]
 """Type alias for plain data, that is, JSON-like data such as primitives, lists and string-keyed dictionaries."""
@@ -363,5 +374,8 @@ def check_serializable(object: Serializable) -> None:
     try:
         assert decoded.encode() == encoded
     except Exception as err:
-        msg = f"Second encoding of `{type(decoded).__name__}` does not match first encoding"
+        msg = (
+            f"Second encoding of `{type(decoded).__name__}` does not match first encoding:"
+            f"{encoded}\nvs.\n{decoded.encode()}"
+        )
         raise AssertionError(msg) from err

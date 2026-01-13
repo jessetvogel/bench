@@ -141,7 +141,7 @@ def _check_user_type(cls: type[Task | Method | Result], user_type: type) -> None
         )
         raise ValueError(msg)
     # Check if abstract methods are implemented
-    user_type_abstract_methods = user_type.__abstractmethods__  # type: ignore[attr-defined]
+    user_type_abstract_methods = user_type.__abstractmethods__
     if user_type_abstract_methods:
         tmp = ", ".join([f"'{f}'" for f in user_type_abstract_methods])
         msg = f"Class `{user_type.__name__}` must implement the following methods before it can be used: {tmp}"

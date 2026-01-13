@@ -73,9 +73,9 @@ def test_bench_add_type_that_does_not_implement_abstract_methods() -> None:
     class M(Method): ...
 
     with pytest.raises(ValueError, match="must implement"):
-        bench.task(T)  # type: ignore[type-abstract]
+        bench.task(T)
     with pytest.raises(ValueError, match="must implement"):
-        bench.method(M)  # type: ignore[type-abstract]
+        bench.method(M)
 
 
 def test_bench_add_types_are_stored() -> None:

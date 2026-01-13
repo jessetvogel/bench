@@ -138,7 +138,7 @@ class Menu(Column):
         def set_column() -> None:
             column.clear()
             for task in self._tasks():
-                column.append(self._item(task.label(), onclick=lambda t=task: self._click_task(t)))  # type: ignore[misc]
+                column.append(self._item(task.label(), onclick=lambda t=task: self._click_task(t)))
 
         Effect(set_column)
         return column
