@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import inspect
 import json
 from abc import update_abstractmethods
@@ -358,6 +359,7 @@ def check_serializable(object: Serializable) -> None:
         DecodingError: If an exception occurs during decoding of the encoding of the object.
     """
     cls = object.__class__
+
     try:
         encoded = object.encode()
     except Exception as err:
@@ -367,7 +369,7 @@ def check_serializable(object: Serializable) -> None:
         msg = f"Encoding of `{cls.__name__}` did not produce plain data"
         raise TypeError(msg)
     try:
-        decoded = cls.decode(encoded)
+        decoded = cls.decode(copy.deepcopy(encoded))
     except Exception as err:
         msg = f"Exception occurred during decoding `{cls.__name__}`"
         raise DecodingError(msg) from err
@@ -375,7 +377,7 @@ def check_serializable(object: Serializable) -> None:
         assert decoded.encode() == encoded
     except Exception as err:
         msg = (
-            f"Second encoding of `{type(decoded).__name__}` does not match first encoding:"
+            f"Second encoding of `{type(decoded).__name__}` does not match first encoding:\n"
             f"{encoded}\nvs.\n{decoded.encode()}"
         )
         raise AssertionError(msg) from err
