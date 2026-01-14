@@ -6,10 +6,10 @@ management side of the benchmark, and provides a user-friendly dashboard for run
 viewing the results.
 
 A benchmark consist of various types of *tasks* and various types of *methods* to perform these tasks.
-This information, and more, is stored in a :py:class:`Bench` instance, which represents the benchmark.
+This information, and more, is stored in a :py:class:`~bench.Bench` instance, which represents the benchmark.
 One can define a new type of task by creating a Python class that derives from :py:class:`~bench.templates.Task` class.
 Similarly, a new class of methods is created as a Python class deriving from the :py:class:`~bench.templates.Method` class.
-These classes can then be added to a :py:class:`Bench` instance using :py:meth:`Bench.task() <bench.Bench.task>` and :py:meth:`Bench.method() <bench.Bench.method>`.
+These classes can then be added to a :py:class:`~bench.Bench` instance using :py:meth:`Bench.task() <bench.Bench.task>` and :py:meth:`Bench.method() <bench.Bench.method>`.
 
 Next, the :py:meth:`Bench.run() <bench.Bench.run>` decorator is used to set a callback function that executes a given task with a given method.
 Such a callback function should return a :py:class:`~bench.templates.Result` instance (e.g., a :py:class:`~bench.templates.PlainResult` or an instance of a user-defined result type that was added using :py:meth:`Bench.result() <bench.Bench.result>`). The result instance is automatically stored in a local database, and it should contain all the relevant raw results of the execution.
@@ -21,7 +21,7 @@ which are decorated by a :py:class:`~bench.templates.Metric` instance.
 
 **Example**
 
-Open a new file ``my_benchmark.py`` and create a :py:class:`Bench` instance. Implement your own task type :py:class:`MyTask`, method type :py:class:`MyMethod` and result type :py:class:`MyResult`, and add them to the :py:class:`Bench` instance. Finally, implement a function :py:meth:`run` to execute an instance of your task using an instance of your method.
+Open a new file ``my_benchmark.py`` and create a :py:class:`~bench.Bench` instance. Implement your own task type :py:class:`MyTask`, method type :py:class:`MyMethod` and result type :py:class:`MyResult`, and add them to the :py:class:`~bench.Bench` instance. Finally, implement a function :py:meth:`run` to execute an instance of your task using an instance of your method.
 
 .. code-block:: python
 
