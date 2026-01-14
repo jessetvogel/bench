@@ -376,8 +376,5 @@ def check_serializable(object: Serializable) -> None:
     try:
         assert decoded.encode() == encoded
     except Exception as err:
-        msg = (
-            f"Second encoding of `{type(decoded).__name__}` does not match first encoding:\n"
-            f"{encoded}\nvs.\n{decoded.encode()}"
-        )
+        msg = f"Second encoding of `{type(decoded).__name__}` does not match first encoding"
         raise AssertionError(msg) from err
