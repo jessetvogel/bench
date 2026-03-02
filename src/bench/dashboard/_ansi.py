@@ -2,7 +2,7 @@ import re
 from typing import Any
 
 _ANSI2HTML_STYLES: dict[str, Any] = {}
-_ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\\d+)*)?([cnRhlABCDfsurgKJipm]))")
+_ANSI_PATTERN = re.compile("(?:\033\\[(\\d+(?:;\\d+)*)?([cnRhlABCDfsurgKJipm]))")
 _ANSI2HTML_PALETTE = [
     "var(--text-muted)",
     "var(--red)",
@@ -97,7 +97,10 @@ def ansi2html(text: str) -> str:
                     # 256 colors
                     color = indexed_style.get(c)  # TODO: convert index to RGB!
                     if color is not None:
-                        sub += '<span style="%s:%s">' % ("color" if extra[0] == "38" else "background-color", color)
+                        sub += '<span style="%s:%s">' % (
+                            "color" if extra[0] == "38" else "background-color",
+                            color,
+                        )
                         stack.append(extra)
                 elif state in ("r", "g", "b"):
                     extra.append(c)
@@ -112,7 +115,10 @@ def ansi2html(text: str) -> str:
                         except (ValueError, TypeError):
                             pass
                         else:
-                            sub += '<span style="%s:%s">' % ("color" if extra[0] == "38" else "background-color", color)
+                            sub += '<span style="%s:%s">' % (
+                                "color" if extra[0] == "38" else "background-color",
+                                color,
+                            )
                             stack.append(extra)
             else:
                 if "1" in stack:
