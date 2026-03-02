@@ -110,7 +110,7 @@ def default_encode(cls: type[T], object: T) -> PlainData:
     # `timedelta`
     if cls_origin is timedelta:
         assert isinstance(object, timedelta)
-        return {"sec": object.total_seconds()}
+        return {"sec": object.total_seconds()}  # ty: ignore[unresolved-attribute]
 
     # `cls` implementing `Serializable`
     if is_serializable(cls_origin):
@@ -187,7 +187,7 @@ def default_decode(cls: type[T], data: PlainData) -> T:
     # `timedelta`
     if cls_origin is timedelta:
         assert isinstance(data, dict)
-        return timedelta(seconds=cast(float, data["sec"]))  # type: ignore[return-value]
+        return timedelta(seconds=cast(float, data["sec"]))
 
     # `cls` implementing `Serializable`
     if is_serializable(cls_origin):
@@ -315,7 +315,7 @@ def is_plain_data(data: Any) -> bool:
     """Check if `data` is of type :py:class:`PlainData`."""
     if data is None or isinstance(data, (str, int, float)):
         return True
-    if isinstance(data, list):
+    if isinstance(data, (list, tuple)):
         return all(is_plain_data(x) for x in data)
     if isinstance(data, dict):
         return all(isinstance(key, str) and is_plain_data(value) for key, value in data.items())

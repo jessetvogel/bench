@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import cast
 
 from slash import App
 from slash.core import Elem, Session
@@ -11,7 +10,7 @@ import bench
 from bench._engine import Engine
 from bench.dashboard.components import Menu, PageNewTask
 
-PATH_ASSETS = Path(cast(str, bench.__file__)).resolve().parent / "assets"
+PATH_ASSETS = Path(bench.__file__).resolve().parent / "assets"
 
 
 class Dashboard:

@@ -56,7 +56,7 @@ class TypedFunction(Generic[T]):
 
         # Validate and set type hints of parameters and return value
         type_hints = get_type_hints(self._func)
-        self._param_type_hints: tuple[tuple[type, ...] | None] = tuple(
+        self._param_type_hints: tuple[tuple[type, ...] | None, ...] = tuple(
             self._validate_type_hint(param_name, type_hints.get(param_name, None), param_type)
             for param_name, param_type in zip(self._param_names, self._param_types)
         )

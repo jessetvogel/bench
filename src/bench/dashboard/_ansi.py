@@ -2,7 +2,7 @@ import re
 from typing import Any
 
 _ANSI2HTML_STYLES: dict[str, Any] = {}
-_ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\d+)*)?([cnRhlABCDfsurgKJipm]))")
+_ANSI_PATTERN = re.compile("(?:\033\\[(\d+(?:;\\d+)*)?([cnRhlABCDfsurgKJipm]))")
 _ANSI2HTML_PALETTE = [
     "var(--text-muted)",
     "var(--red)",

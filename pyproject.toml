@@ -19,7 +19,10 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
     "Programming Language :: Python :: 3",
 ]
-dependencies = ["slash @ git+https://github.com/jessetvogel/slash.git@main"]
+dependencies = [
+    "numpy",
+    "slash @ git+https://github.com/jessetvogel/slash.git@main",
+]
 
 [project.optional-dependencies]
 dev = [
