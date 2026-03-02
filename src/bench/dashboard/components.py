@@ -16,7 +16,22 @@ from slash.basic import Graph as SlashGraph
 from slash.basic import Plot as SlashPlot
 from slash.core import Children, Elem, Session
 from slash.events import ClickEvent
-from slash.html import H3, HTML, Button, Code, Details, Dialog, Div, Input, Option, P, Pre, Select, Span, Summary
+from slash.html import (
+    H3,
+    HTML,
+    Button,
+    Code,
+    Details,
+    Dialog,
+    Div,
+    Input,
+    Option,
+    P,
+    Pre,
+    Select,
+    Span,
+    Summary,
+)
 from slash.layout import Column, Panel, Row
 from slash.reactive import Effect, Signal
 
@@ -24,7 +39,13 @@ from bench._cache import BENCH_CACHE
 from bench._engine import Engine, ExecutionProcess, Run
 from bench._logging import get_logger
 from bench.dashboard._ansi import ansi2html
-from bench.dashboard.utils import RunGroup, Timer, download_file, get_color, timedelta_to_str
+from bench.dashboard.utils import (
+    RunGroup,
+    Timer,
+    download_file,
+    get_color,
+    timedelta_to_str,
+)
 from bench.metrics import Graph, Metric, Table, Time
 from bench.templates import Param, Task
 
@@ -98,7 +119,11 @@ class Menu(Column):
             }
         )
 
-    def _item(self, *children: Children, onclick: Callable[[], Awaitable[Any] | Any] | None = None) -> Elem:
+    def _item(
+        self,
+        *children: Children,
+        onclick: Callable[[], Awaitable[Any] | Any] | None = None,
+    ) -> Elem:
         item = Div(*children).style(
             {
                 "display": "flex",
@@ -114,15 +139,35 @@ class Menu(Column):
         return item
 
     def _separator(self) -> Elem:
-        return Div().style({"height": "0px", "border-bottom": "1px solid var(--border)", "margin": "8px"})
+        return Div().style(
+            {
+                "height": "0px",
+                "border-bottom": "1px solid var(--border)",
+                "margin": "8px",
+            }
+        )
 
     def _theme_buttons(self) -> Elem:
         return Row(
             Row(Icon("sun"), "light")
-            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "6px"})
+            .style(
+                {
+                    "cursor": "pointer",
+                    "opacity": "0.33",
+                    "align-items": "center",
+                    "gap": "6px",
+                }
+            )
             .onclick(lambda: Session.require().set_theme("light")),
             Row(Icon("moon"), "dark")
-            .style({"cursor": "pointer", "opacity": "0.33", "align-items": "center", "gap": "6px"})
+            .style(
+                {
+                    "cursor": "pointer",
+                    "opacity": "0.33",
+                    "align-items": "center",
+                    "gap": "6px",
+                }
+            )
             .onclick(lambda: Session.require().set_theme("dark")),
         ).style({"margin": "auto 0px 8px 0px", "justify-content": "center", "gap": "32px"})
 
@@ -426,7 +471,12 @@ class PageTask(Div):
                     for metric in self._task.type_metrics()
                 ]
             ).style(
-                {"display": "flex", "gap": "16px", "flex-wrap": "wrap", "align-items": "flex-start"},
+                {
+                    "display": "flex",
+                    "gap": "16px",
+                    "flex-wrap": "wrap",
+                    "align-items": "flex-start",
+                },
             ),
         )
         Effect(lambda: header_metrics.style({"display": None if self._selected_groups() else "none"}))
@@ -496,7 +546,8 @@ class PageTask(Div):
         type_metrics = self._task.type_metrics()
         data = [  # TODO: try-catch
             {
-                "method": self._engine.cache.select_method(group.method_id).encode(),
+                "method": (method := self._engine.cache.select_method(group.method_id)).label(),
+                "options": method.encode(),
                 "runs": [
                     {
                         metric.name: metric.encode_value(self._engine.evaluate_metric(metric, run))
@@ -554,7 +605,7 @@ class TimeElem(Panel):
             # Compute average `timedelta` and convert to string
             data.append(
                 {
-                    key: timedelta_to_str(sum(ts, start=timedelta(seconds=0)) / len(ts)) if len(ts) > 0 else "-"
+                    key: (timedelta_to_str(sum(ts, start=timedelta(seconds=0)) / len(ts)) if len(ts) > 0 else "-")
                     for key, ts in timedeltas.items()
                 }
             )
@@ -762,7 +813,13 @@ class DialogNewRun(Dialog):
         self._form_wrapper.clear()
         if method_params:
             self._form_wrapper.append(
-                Div().style({"background-color": "var(--border-muted)", "height": "1px", "margin": "16px 0px"})
+                Div().style(
+                    {
+                        "background-color": "var(--border-muted)",
+                        "height": "1px",
+                        "margin": "16px 0px",
+                    }
+                )
             )
         self._form = Form(method_params)
         self._form_wrapper.append(self._form)
@@ -857,10 +914,23 @@ def action_button(*children: Children) -> Button:
 
 
 def group_circle(group: RunGroup) -> Div:
-    return Div().style({"width": "24px", "height": "24px", "border-radius": "12px", "background-color": group.color})
+    return Div().style(
+        {
+            "width": "24px",
+            "height": "24px",
+            "border-radius": "12px",
+            "background-color": group.color,
+        }
+    )
 
 
-def group_badge(engine: Engine, group: RunGroup, *, show_runs: bool = False, show_description: bool = False) -> Span:
+def group_badge(
+    engine: Engine,
+    group: RunGroup,
+    *,
+    show_runs: bool = False,
+    show_description: bool = False,
+) -> Span:
     try:
         method = engine.cache.select_method(group.method_id)
         method_label = method.label()
